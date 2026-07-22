@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ plugins {
   id("getstream.android.library")
   id("getstream.android.library.compose")
   id("getstream.android.feature")
+  id("getstream.android.hilt")
   id("getstream.spotless")
 }
 
@@ -25,5 +26,14 @@ android {
 }
 
 dependencies {
+  implementation(libs.androidx.lifecycle.runtimeCompose)
+  implementation(libs.androidx.lifecycle.viewModelCompose)
+  implementation(libs.androidx.activity.compose)
+  implementation(libs.landscapist.glide)
   implementation(libs.stream.log)
+
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.auth)
+  implementation(libs.firebase.firestore)
+  implementation(libs.firebase.storage)
 }

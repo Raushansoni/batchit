@@ -16,24 +16,80 @@
 
 package io.getstream.whatsappclone.camera
 
+import android.Manifest
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
+import io.getstream.whatsappclone.designsystem.theme.DARK_GREEN300
+import io.getstream.whatsappclone.designsystem.theme.GREEN500
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun WhatsAppCamera() {
+  val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+
+  LaunchedEffect(Unit) {
+    if (!cameraPermission.status.isGranted) {
+      cameraPermission.launchPermissionRequest()
+    }
+  }
+
   Box(
-    modifier = Modifier.fillMaxSize(),
+    modifier = Modifier
+      .fillMaxSize()
+      .background(DARK_GREEN300),
     contentAlignment = Alignment.Center
   ) {
-    Text(
-      text = "Camera feature is not available now",
-      color = MaterialTheme.colorScheme.tertiary,
-      style = MaterialTheme.typography.bodyLarge
-    )
+    Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center,
+      modifier = Modifier.padding(24.dp)
+    ) {
+      Box(
+        modifier = Modifier
+          .size(88.dp)
+          .background(GREEN500, CircleShape),
+        contentAlignment = Alignment.Center
+      ) {
+        Icon(
+          imageVector = WhatsAppIcons.Camera,
+          contentDescription = null,
+          tint = Color.White,
+          modifier = Modifier.size(40.dp)
+        )
+      }
+      Spacer(modifier = Modifier.height(16.dp))
+      Text(
+        text = if (cameraPermission.status.isGranted) {
+          "Camera ready — capture photos from chat attachments or Status."
+        } else {
+          "Allow camera access to take photos and videos for chats and Status."
+        },
+        style = MaterialTheme.typography.bodyLarge,
+        color = Color.White,
+        textAlign = TextAlign.Center
+      )
+    }
   }
 }

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright 2023 Stream.IO, Inc. All Rights Reserved.
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<resources>
+  <string name="auth_welcome_title">Welcome to BatchIt</string>
+  <string name="auth_welcome_subtitle">Enter your phone number to get started</string>
+  <string name="auth_phone_hint">Phone number</string>
+  <string name="auth_continue">Continue</string>
+  <string name="auth_demo_continue">Continue as demo user</string>
+  <string name="auth_otp_title">Verify your number</string>
+  <string name="auth_otp_subtitle">Enter the 6-digit code we sent you</string>
+  <string name="auth_otp_hint">Verification code</string>
+  <string name="auth_verify">Verify</string>
+  <string name="auth_profile_title">Profile info</string>
+  <string name="auth_profile_subtitle">Please provide your name</string>
+  <string name="auth_name_hint">Your name</string>
+  <string name="auth_save">Save</string>
+  <string name="auth_error_generic">Something went wrong. Please try again.</string>
+</resources>

@@ -18,26 +18,16 @@ package io.getstream.whatsappclone.video.initializer
 
 import android.content.Context
 import androidx.startup.Initializer
-import io.getstream.video.android.core.StreamVideo
-import io.getstream.video.android.core.StreamVideoBuilder
-import io.getstream.video.android.model.User
-import io.getstream.whatsappclone.video.BuildConfig
+import io.getstream.log.streamLog
 
+/**
+ * Stream Video is connected after auth by [io.getstream.whatsappclone.auth.StreamSessionManager].
+ * Kept as a Startup Initializer so MainInitializer dependency graph stays stable.
+ */
 class StreamVideoInitializer : Initializer<Unit> {
 
   override fun create(context: Context) {
-    val userId = "stream"
-    StreamVideoBuilder(
-      context = context,
-      apiKey = BuildConfig.STREAM_API_KEY,
-      token = StreamVideo.devToken(userId),
-      user = User(
-        id = userId,
-        name = "stream",
-        image = "http://placekitten.com/200/300",
-        role = "admin"
-      )
-    ).build()
+    streamLog { "StreamVideoInitializer deferred — connect after auth" }
   }
 
   override fun dependencies(): List<Class<out Initializer<*>>> = emptyList()

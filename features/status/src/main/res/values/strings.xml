@@ -15,7 +15,15 @@
      limitations under the License.
 -->
 <resources>
-  <string name="status_mine">My Status</string>
+  <string name="status_mine">My status</string>
   <string name="status_desc">Tap to add status update</string>
   <string name="recent_updates">Recent updates</string>
+  <string name="status_no_recent">No recent updates yet</string>
+  <string name="status_add">Add status</string>
+  <string name="status_compose_title">New status</string>
+  <string name="status_compose_text">Text status</string>
+  <string name="status_type_hint">Type a status…</string>
+  <string name="status_pick_image">Photo</string>
+  <string name="status_post">Post</string>
+  <string name="status_close">Close</string>
 </resources>

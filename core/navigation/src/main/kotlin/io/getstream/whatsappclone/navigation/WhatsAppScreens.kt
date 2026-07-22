@@ -76,6 +76,12 @@ sealed class WhatsAppScreens(
       name.replace("{${navArguments[0].name}}", callId)
         .replace("{${navArguments[1].name}}", videoCall.toString())
   }
+
+  // settings
+  data object Settings : WhatsAppScreens("settings")
+
+  // privacy settings
+  data object PrivacySettings : WhatsAppScreens("privacy_settings")
 }
 
 private fun String.appendArguments(navArguments: List<NamedNavArgument>): String {

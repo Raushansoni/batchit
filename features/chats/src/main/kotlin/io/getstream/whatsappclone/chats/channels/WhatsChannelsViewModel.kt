@@ -39,16 +39,40 @@ class WhatsChannelsViewModel @Inject constructor(
   }
 
   fun createChannel() {
+    createDirectChannel(userId = null)
+  }
+
+  fun createDirectChannel(userId: String?) {
     viewModelScope.launch {
-      val me = user.value
-      if (me != null) {
-        chatClient.createChannel(
-          channelType = "messaging",
-          channelId = "channel${Random.nextInt(10000)}",
-          memberIds = listOf(me.id),
-          extraData = mapOf()
-        ).await()
+      val me = user.value ?: return@launch
+      val members = buildList {
+        add(me.id)
+        if (!userId.isNullOrBlank()) add(userId)
       }
+      val channelId = if (userId.isNullOrBlank()) {
+        "channel${Random.nextInt(10000)}"
+      } else {
+        listOf(me.id, userId).sorted().joinToString("-")
+      }
+      chatClient.createChannel(
+        channelType = "messaging",
+        channelId = channelId,
+        memberIds = members,
+        extraData = mapOf()
+      ).await()
+    }
+  }
+
+  fun createGroupChannel(name: String, memberIds: List<String>) {
+    viewModelScope.launch {
+      val me = user.value ?: return@launch
+      val members = (listOf(me.id) + memberIds).distinct()
+      chatClient.createChannel(
+        channelType = "messaging",
+        channelId = "group${Random.nextInt(100000)}",
+        memberIds = members,
+        extraData = mapOf("name" to name)
+      ).await()
     }
   }
 }

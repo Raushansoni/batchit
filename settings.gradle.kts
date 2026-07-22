@@ -16,7 +16,7 @@ dependencyResolutionManagement {
     maven(url = "https://oss.sonatype.org/content/repositories/snapshots/")
   }
 }
-rootProject.name = "WhatsAppCloneCompose"
+rootProject.name = "BatchIt"
 include(":app")
 include(":core:designsystem")
 include(":core:navigation")
@@ -30,4 +30,6 @@ include(":features:chats")
 include(":features:status")
 include(":features:calls")
 include(":features:video")
+include(":features:auth")
+include(":features:settings")
 include(":benchmark")

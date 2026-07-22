@@ -16,21 +16,32 @@
 
 package io.getstream.whatsappclone.status
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,84 +50,304 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.skydoves.landscapist.glide.GlideImage
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
+import io.getstream.whatsappclone.designsystem.theme.GREEN400
 import io.getstream.whatsappclone.designsystem.theme.GREEN500
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.designsystem.theme.getTitleColor
+import io.getstream.whatsappclone.status.model.StatusItem
+import java.text.DateFormat
+import java.util.Date
+
+private sealed interface StatusOverlay {
+  data object None : StatusOverlay
+  data object Composer : StatusOverlay
+  data class Viewer(val userId: String, val startIndex: Int = 0) : StatusOverlay
+}
 
 @Composable
-fun WhatsAppStatus() {
-  Box {
-    Column(
-      modifier = Modifier
-        .fillMaxSize()
-        .clickable { }
-        .padding(12.dp)
-    ) {
-      Row(
-        modifier = Modifier
-          .wrapContentSize(),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        GlideImage(
-          modifier = Modifier
-            .size(56.dp)
-            .clip(CircleShape),
-          imageModel = { "https://placekitten.com/200/300" },
-          previewPlaceholder = painterResource(
-            id = io.getstream.whatsappclone.designsystem.R.drawable.placeholder
+fun WhatsAppStatus(
+  viewModel: StatusViewModel = hiltViewModel()
+) {
+  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  var overlay by remember { mutableStateOf<StatusOverlay>(StatusOverlay.None) }
+
+  Box(modifier = Modifier.fillMaxSize()) {
+    StatusListScreen(
+      uiState = uiState,
+      onMyStatusClick = {
+        if (uiState.myStatuses.isNotEmpty()) {
+          overlay = StatusOverlay.Viewer(
+            userId = uiState.myStatuses.first().userId
           )
+        } else {
+          overlay = StatusOverlay.Composer
+        }
+      },
+      onContactClick = { status ->
+        overlay = StatusOverlay.Viewer(userId = status.userId)
+      },
+      onFabClick = { overlay = StatusOverlay.Composer }
+    )
+
+    when (val current = overlay) {
+      StatusOverlay.None -> Unit
+      StatusOverlay.Composer -> {
+        StatusComposerScreen(
+          isSaving = uiState.isSaving,
+          onClose = { overlay = StatusOverlay.None },
+          onPostText = { text ->
+            viewModel.createTextStatus(text) {
+              overlay = StatusOverlay.None
+            }
+          },
+          onPostImage = { uri, caption ->
+            viewModel.createImageStatus(uri, caption) {
+              overlay = StatusOverlay.None
+            }
+          }
         )
-
-        Column(modifier = Modifier.padding(start = 12.dp)) {
-          Text(
-            text = stringResource(id = R.string.status_mine),
-            style = MaterialTheme.typography.titleMedium,
-            color = getTitleColor()
+      }
+      is StatusOverlay.Viewer -> {
+        val statuses = viewModel.statusesForUser(current.userId)
+        if (statuses.isNotEmpty()) {
+          StatusViewerScreen(
+            statuses = statuses,
+            initialIndex = current.startIndex.coerceIn(0, statuses.lastIndex),
+            onClose = { overlay = StatusOverlay.None },
+            onStatusViewed = viewModel::markViewed
           )
+        }
+      }
+    }
+  }
+}
 
-          Spacer(modifier = Modifier.size(6.dp))
+@Composable
+private fun StatusListScreen(
+  uiState: StatusUiState,
+  onMyStatusClick: () -> Unit,
+  onContactClick: (StatusItem) -> Unit,
+  onFabClick: () -> Unit
+) {
+  Box(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+      modifier = Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(bottom = 88.dp)
+    ) {
+      item {
+        MyStatusRow(
+          myStatuses = uiState.myStatuses,
+          onClick = onMyStatusClick
+        )
+      }
 
+      item {
+        Text(
+          modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+          text = stringResource(id = R.string.recent_updates),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onTertiary
+        )
+      }
+
+      if (uiState.recentContacts.isEmpty()) {
+        item {
           Text(
-            text = stringResource(id = R.string.status_desc),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            text = stringResource(id = R.string.status_no_recent),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onTertiary
           )
         }
+      } else {
+        items(
+          items = uiState.recentContacts,
+          key = { it.userId }
+        ) { status ->
+          ContactStatusRow(
+            status = status,
+            onClick = { onContactClick(status) }
+          )
+        }
       }
-
-      Spacer(modifier = Modifier.size(16.dp))
-
-      Text(
-        text = stringResource(id = R.string.recent_updates),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onTertiary
-      )
     }
 
-    FloatingActionButton(
+    Column(
       modifier = Modifier
         .align(Alignment.BottomEnd)
         .padding(16.dp)
-        .size(58.dp),
-      containerColor = GREEN500,
-      shape = CircleShape,
-      onClick = { }
     ) {
-      Icon(
-        imageVector = WhatsAppIcons.Camera,
-        contentDescription = null,
-        tint = Color.White
+      FloatingActionButton(
+        modifier = Modifier
+          .padding(bottom = 12.dp)
+          .size(48.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = CircleShape,
+        onClick = onFabClick
+      ) {
+        Icon(
+          imageVector = Icons.Default.Edit,
+          contentDescription = stringResource(id = R.string.status_compose_text),
+          tint = GREEN500
+        )
+      }
+
+      FloatingActionButton(
+        modifier = Modifier.size(58.dp),
+        containerColor = GREEN500,
+        shape = CircleShape,
+        onClick = onFabClick
+      ) {
+        Icon(
+          imageVector = WhatsAppIcons.Camera,
+          contentDescription = stringResource(id = R.string.status_add),
+          tint = Color.White
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun MyStatusRow(
+  myStatuses: List<StatusItem>,
+  onClick: () -> Unit
+) {
+  val hasStatus = myStatuses.isNotEmpty()
+  val imageUrl = myStatuses.firstOrNull()?.userImage
+    ?.takeIf { it.isNotBlank() }
+    ?: "https://i.pravatar.cc/150?u=me"
+
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick)
+      .padding(horizontal = 12.dp, vertical = 10.dp),
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    Box {
+      GlideImage(
+        modifier = Modifier
+          .size(56.dp)
+          .clip(CircleShape)
+          .then(
+            if (hasStatus) {
+              Modifier.border(2.dp, GREEN400, CircleShape)
+            } else {
+              Modifier
+            }
+          ),
+        imageModel = { imageUrl },
+        previewPlaceholder = painterResource(
+          id = io.getstream.whatsappclone.designsystem.R.drawable.placeholder
+        )
+      )
+      if (!hasStatus) {
+        Box(
+          modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .size(20.dp)
+            .clip(CircleShape)
+            .background(GREEN500),
+          contentAlignment = Alignment.Center
+        ) {
+          Text(
+            text = "+",
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall
+          )
+        }
+      }
+    }
+
+    Column(modifier = Modifier.padding(start = 12.dp)) {
+      Text(
+        text = stringResource(id = R.string.status_mine),
+        style = MaterialTheme.typography.titleMedium,
+        color = getTitleColor()
+      )
+      Spacer(modifier = Modifier.size(4.dp))
+      Text(
+        text = if (hasStatus) {
+          formatStatusTime(myStatuses.maxOf { it.createdAt })
+        } else {
+          stringResource(id = R.string.status_desc)
+        },
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onTertiary
       )
     }
   }
 }
 
+@Composable
+private fun ContactStatusRow(
+  status: StatusItem,
+  onClick: () -> Unit
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick)
+      .padding(horizontal = 12.dp, vertical = 10.dp),
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    GlideImage(
+      modifier = Modifier
+        .size(56.dp)
+        .clip(CircleShape)
+        .border(2.dp, GREEN400, CircleShape),
+      imageModel = {
+        status.userImage.ifBlank { "https://i.pravatar.cc/150?u=${status.userId}" }
+      },
+      previewPlaceholder = painterResource(
+        id = io.getstream.whatsappclone.designsystem.R.drawable.placeholder
+      )
+    )
+
+    Column(modifier = Modifier.padding(start = 12.dp)) {
+      Text(
+        text = status.userName,
+        style = MaterialTheme.typography.titleMedium,
+        color = getTitleColor()
+      )
+      Spacer(modifier = Modifier.size(4.dp))
+      Text(
+        text = formatStatusTime(status.createdAt),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onTertiary
+      )
+    }
+  }
+}
+
+private fun formatStatusTime(millis: Long): String =
+  DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(millis))
+
 @Preview
 @Composable
 private fun WhatsAppStatusPreview() {
   WhatsAppCloneComposeTheme {
-    WhatsAppStatus()
+    StatusListScreen(
+      uiState = StatusUiState(
+        isLoading = false,
+        contactStatuses = listOf(
+          StatusItem(
+            id = "1",
+            userId = "a",
+            userName = "Alice",
+            userImage = "",
+            text = "Hello"
+          )
+        )
+      ),
+      onMyStatusClick = {},
+      onContactClick = {},
+      onFabClick = {}
+    )
   }
 }

@@ -40,11 +40,24 @@ retrofitKotlinxSerializationJson = "1.0.0"
 googleSecretPlugin = "2.0.1"
 spotless = "6.7.0"
 turbine = "1.1.0"
+firebaseBom = "33.7.0"
+googleServices = "4.4.2"
+crashlytics = "3.0.2"
+streamAndroidPush = "1.3.4"
 
 [libraries]
 stream-chat-client = { group = "io.getstream", name = "stream-chat-android-client", version.ref = "streamChatSDK" }
 stream-chat-offline = { group = "io.getstream", name = "stream-chat-android-offline", version.ref = "streamChatSDK" }
 stream-chat-compose = { group = "io.getstream", name = "stream-chat-android-compose", version.ref = "streamChatSDK" }
+stream-chat-push-firebase = { group = "io.getstream", name = "stream-android-push-firebase", version.ref = "streamAndroidPush" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth-ktx" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage-ktx" }
+firebase-functions = { group = "com.google.firebase", name = "firebase-functions-ktx" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics-ktx" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics-ktx" }
 stream-video-core = { group = "io.getstream", name = "stream-video-android-core", version.ref = "streamVideoSDK" }
 stream-video-compose = { group = "io.getstream", name = "stream-video-android-ui-compose", version.ref = "streamVideoSDK" }
 stream-video-mock = { group = "io.getstream", name = "stream-video-android-previewdata", version.ref = "streamVideoSDK" }
@@ -114,3 +127,5 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 google-secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "googleSecretPlugin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlytics" }

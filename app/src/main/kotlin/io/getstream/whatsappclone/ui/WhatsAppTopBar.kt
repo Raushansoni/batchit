@@ -16,6 +16,7 @@
 
 package io.getstream.whatsappclone.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -33,7 +34,9 @@ import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 
 @Composable
-fun WhatsAppTopBar() {
+fun WhatsAppTopBar(
+  onSettingsClick: () -> Unit = {}
+) {
   TopAppBar(
     modifier = Modifier.fillMaxWidth(),
     title = {
@@ -54,10 +57,12 @@ fun WhatsAppTopBar() {
       Spacer(modifier = Modifier.size(16.dp))
 
       Icon(
-        modifier = Modifier.size(26.dp),
+        modifier = Modifier
+          .size(26.dp)
+          .clickable(onClick = onSettingsClick),
         imageVector = WhatsAppIcons.MoreVert,
         tint = MaterialTheme.colorScheme.tertiary,
-        contentDescription = null
+        contentDescription = stringResource(id = R.string.settings)
       )
     },
     backgroundColor = MaterialTheme.colorScheme.primary

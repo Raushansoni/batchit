@@ -26,4 +26,5 @@ android {
 
 dependencies {
   implementation(libs.stream.log)
+  implementation(libs.accompanist.permissions)
 }

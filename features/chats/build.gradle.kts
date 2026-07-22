@@ -42,6 +42,10 @@ dependencies {
   // Stream Chat SDK
   api(libs.stream.chat.offline)
   api(libs.stream.chat.compose)
+  implementation(libs.stream.chat.push.firebase)
+
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.messaging)
 
   implementation(libs.androidx.lifecycle.runtimeCompose)
   implementation(libs.androidx.lifecycle.viewModelCompose)

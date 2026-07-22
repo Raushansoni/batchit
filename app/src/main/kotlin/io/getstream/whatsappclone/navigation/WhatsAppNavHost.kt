@@ -22,12 +22,13 @@ import androidx.navigation.compose.NavHost
 
 @Composable
 fun WhatsAppNavHost(
-  navHostController: NavHostController
+  navHostController: NavHostController,
+  composeNavigator: AppComposeNavigator
 ) {
   NavHost(
     navController = navHostController,
     startDestination = WhatsAppScreens.Home.route
   ) {
-    whatsAppHomeNavigation()
+    whatsAppHomeNavigation(composeNavigator = composeNavigator)
   }
 }

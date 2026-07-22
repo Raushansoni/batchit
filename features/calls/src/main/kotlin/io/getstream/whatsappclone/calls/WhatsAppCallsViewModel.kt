@@ -60,4 +60,10 @@ class WhatsAppCallsViewModel @Inject constructor(
   fun navigateToCallInfo(whatsAppUser: WhatsAppUser) {
     composeNavigator.navigate(WhatsAppScreens.CallInfo.createRoute(whatsAppUser = whatsAppUser))
   }
+
+  fun startCall(callId: String, videoCall: Boolean) {
+    composeNavigator.navigate(
+      WhatsAppScreens.VideoCall.createRoute(callId = callId, videoCall = videoCall)
+    )
+  }
 }

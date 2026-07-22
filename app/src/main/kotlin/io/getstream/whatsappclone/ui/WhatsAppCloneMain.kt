@@ -18,7 +18,16 @@ package io.getstream.whatsappclone.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
+import io.getstream.whatsappclone.auth.AuthUiState
+import io.getstream.whatsappclone.auth.AuthViewModel
+import io.getstream.whatsappclone.auth.ui.AuthFlow
 import io.getstream.whatsappclone.designsystem.component.WhatsAppCloneBackground
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
@@ -26,19 +35,40 @@ import io.getstream.whatsappclone.navigation.WhatsAppNavHost
 
 @Composable
 fun WhatsAppCloneMain(
-  composeNavigator: AppComposeNavigator
+  composeNavigator: AppComposeNavigator,
+  authViewModel: AuthViewModel = hiltViewModel()
 ) {
   WhatsAppCloneComposeTheme {
-    val navHostController = rememberNavController()
+    val authState by authViewModel.uiState.collectAsStateWithLifecycle()
+    var isAuthenticated by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-      composeNavigator.handleNavigationCommands(navHostController)
+    LaunchedEffect(authState) {
+      if (authState is AuthUiState.Authenticated) {
+        isAuthenticated = true
+      }
+      if (authState is AuthUiState.PhoneInput) {
+        isAuthenticated = false
+      }
     }
 
     WhatsAppCloneBackground {
-      WhatsAppNavHost(
-        navHostController = navHostController
-      )
+      if (!isAuthenticated && authState !is AuthUiState.Authenticated) {
+        AuthFlow(
+          onAuthenticated = { isAuthenticated = true },
+          authViewModel = authViewModel
+        )
+      } else {
+        val navHostController = rememberNavController()
+
+        LaunchedEffect(Unit) {
+          composeNavigator.handleNavigationCommands(navHostController)
+        }
+
+        WhatsAppNavHost(
+          navHostController = navHostController,
+          composeNavigator = composeNavigator
+        )
+      }
     }
   }
 }

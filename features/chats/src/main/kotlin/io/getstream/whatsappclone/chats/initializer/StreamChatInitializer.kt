@@ -18,9 +18,10 @@ package io.getstream.whatsappclone.chats.initializer
 
 import android.content.Context
 import androidx.startup.Initializer
+import io.getstream.android.push.firebase.FirebasePushDeviceGenerator
 import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.client.logger.ChatLogLevel
-import io.getstream.chat.android.models.User
+import io.getstream.chat.android.client.notifications.handler.NotificationConfig
 import io.getstream.chat.android.offline.plugin.factory.StreamOfflinePluginFactory
 import io.getstream.chat.android.state.plugin.config.StatePluginConfig
 import io.getstream.chat.android.state.plugin.factory.StreamStatePluginFactory
@@ -28,18 +29,13 @@ import io.getstream.log.streamLog
 import io.getstream.whatsappclone.chats.BuildConfig
 
 /**
- * StreamChatInitializer initializes all Stream Client components.
+ * Initializes Stream ChatClient only. User connection happens after auth via StreamSessionManager.
  */
 class StreamChatInitializer : Initializer<Unit> {
 
   override fun create(context: Context) {
     streamLog { "StreamChatInitializer is initialized" }
 
-    /**
-     * initialize a global instance of the [ChatClient].
-     * The ChatClient is the main entry point for all low-level operations on chat.
-     * e.g, connect/disconnect user to the server, send/update/pin message, etc.
-     */
     val logLevel = if (BuildConfig.DEBUG) ChatLogLevel.ALL else ChatLogLevel.NOTHING
     val offlinePluginFactory = StreamOfflinePluginFactory(
       appContext = context
@@ -51,19 +47,22 @@ class StreamChatInitializer : Initializer<Unit> {
       ),
       appContext = context
     )
-    val chatClient = ChatClient.Builder(BuildConfig.STREAM_API_KEY, context)
-      .withPlugins(offlinePluginFactory, statePluginFactory)
-      .logLevel(logLevel)
-      .build()
 
-    val user = User(
-      id = "stream",
-      name = "stream",
-      image = "https://placekitten.com/200/300"
+    val notificationConfig = NotificationConfig(
+      pushNotificationsEnabled = true,
+      pushDeviceGenerators = listOf(
+        FirebasePushDeviceGenerator(
+          context = context,
+          providerName = "firebase"
+        )
+      )
     )
 
-    val token = chatClient.devToken(user.id)
-    chatClient.connectUser(user, token).enqueue()
+    ChatClient.Builder(BuildConfig.STREAM_API_KEY, context)
+      .withPlugins(offlinePluginFactory, statePluginFactory)
+      .notifications(notificationConfig)
+      .logLevel(logLevel)
+      .build()
   }
 
   override fun dependencies(): List<Class<out Initializer<*>>> =
