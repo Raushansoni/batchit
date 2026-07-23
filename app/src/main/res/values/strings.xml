@@ -29,6 +29,10 @@
   <string name="update_available_default_notes">Bug fixes and improvements.</string>
   <string name="update_button">Update</string>
   <string name="update_later">Later</string>
+  <string name="update_checking_title">Checking for updates</string>
+  <string name="update_checking_message">Looking for a newer version of BatchIt…</string>
+  <string name="update_up_to_date_title">You\'re up to date</string>
+  <string name="update_up_to_date_message">You already have the latest version of BatchIt.</string>
   <string name="update_downloading_title">Downloading update</string>
   <string name="update_downloading_message">Downloading BatchIt %1$s. You will be prompted to install when it finishes.</string>
   <string name="update_error_title">Update failed</string>

@@ -40,10 +40,11 @@ import kotlinx.coroutines.launch
 
 sealed interface AppUpdateUiState {
   data object Idle : AppUpdateUiState
-  data object Checking : AppUpdateUiState
+  data class Checking(val userInitiated: Boolean = false) : AppUpdateUiState
   data class Available(val info: AppUpdateInfo) : AppUpdateUiState
   data class Downloading(val info: AppUpdateInfo) : AppUpdateUiState
   data class ReadyToInstall(val info: AppUpdateInfo, val file: File) : AppUpdateUiState
+  data object UpToDate : AppUpdateUiState
   data class Error(val message: String) : AppUpdateUiState
   data object Dismissed : AppUpdateUiState
 }
@@ -76,25 +77,30 @@ class AppUpdateViewModel @Inject constructor(
     }
   }
 
-  fun checkForUpdate() {
-    if (_uiState.value is AppUpdateUiState.Available ||
-      _uiState.value is AppUpdateUiState.Downloading ||
-      _uiState.value is AppUpdateUiState.ReadyToInstall
-    ) {
-      return
+  fun checkForUpdate(userInitiated: Boolean = false) {
+    when (_uiState.value) {
+      is AppUpdateUiState.Available,
+      is AppUpdateUiState.Downloading,
+      is AppUpdateUiState.ReadyToInstall,
+      is AppUpdateUiState.Checking -> return
+      else -> Unit
     }
     viewModelScope.launch {
-      _uiState.value = AppUpdateUiState.Checking
+      _uiState.value = AppUpdateUiState.Checking(userInitiated)
       val latest = repository.fetchLatestUpdate()
       if (latest == null) {
-        _uiState.value = AppUpdateUiState.Idle
+        _uiState.value = if (userInitiated) {
+          AppUpdateUiState.Error("Could not check for updates. Try again later.")
+        } else {
+          AppUpdateUiState.Idle
+        }
         return@launch
       }
       val current = repository.currentVersionCode()
-      if (latest.versionCode.toLong() > current) {
-        _uiState.value = AppUpdateUiState.Available(latest)
-      } else {
-        _uiState.value = AppUpdateUiState.Idle
+      _uiState.value = when {
+        latest.versionCode.toLong() > current -> AppUpdateUiState.Available(latest)
+        userInitiated -> AppUpdateUiState.UpToDate
+        else -> AppUpdateUiState.Idle
       }
     }
   }

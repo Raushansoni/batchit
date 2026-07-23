@@ -71,6 +71,7 @@ Living changelog of what BatchIt has shipped beyond the upstream GetStream Whats
 
 | Version | Code | Highlights |
 |---------|------|------------|
+| 1.1.4 | 10 | Settings “Check for updates” |
 | 1.1.3 | 9 | Call/message notifications + deep links |
 | 1.1.2 | 8 | Bump so installed clients can detect an available update |
 | 1.1.x | — | Free in-app updates via GitHub Releases + Firestore |

@@ -16,12 +16,14 @@
 
 package io.getstream.whatsappclone.update
 
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,21 +32,34 @@ import io.getstream.whatsappclone.R
 @Composable
 fun AppUpdateHost(
   enabled: Boolean,
-  viewModel: AppUpdateViewModel = hiltViewModel()
+  viewModel: AppUpdateViewModel? = null
 ) {
-  val state by viewModel.uiState.collectAsStateWithLifecycle()
+  val activity = LocalContext.current as ComponentActivity
+  val resolvedViewModel = viewModel ?: hiltViewModel(activity)
+  val state by resolvedViewModel.uiState.collectAsStateWithLifecycle()
 
   LaunchedEffect(enabled) {
     if (enabled) {
-      viewModel.checkForUpdate()
+      resolvedViewModel.checkForUpdate(userInitiated = false)
     }
   }
 
   when (val s = state) {
+    is AppUpdateUiState.Checking -> {
+      if (s.userInitiated) {
+        AlertDialog(
+          onDismissRequest = {},
+          title = { Text(text = stringResource(R.string.update_checking_title)) },
+          text = { Text(text = stringResource(R.string.update_checking_message)) },
+          confirmButton = {}
+        )
+      }
+    }
+
     is AppUpdateUiState.Available -> {
       AlertDialog(
         onDismissRequest = {
-          if (!s.info.forceUpdate) viewModel.dismiss()
+          if (!s.info.forceUpdate) resolvedViewModel.dismiss()
         },
         title = {
           Text(text = stringResource(R.string.update_available_title))
@@ -62,13 +77,13 @@ fun AppUpdateHost(
           )
         },
         confirmButton = {
-          TextButton(onClick = { viewModel.startDownload(s.info) }) {
+          TextButton(onClick = { resolvedViewModel.startDownload(s.info) }) {
             Text(text = stringResource(R.string.update_button))
           }
         },
         dismissButton = {
           if (!s.info.forceUpdate) {
-            TextButton(onClick = { viewModel.dismiss() }) {
+            TextButton(onClick = { resolvedViewModel.dismiss() }) {
               Text(text = stringResource(R.string.update_later))
             }
           }
@@ -92,13 +107,26 @@ fun AppUpdateHost(
       )
     }
 
+    AppUpdateUiState.UpToDate -> {
+      AlertDialog(
+        onDismissRequest = { resolvedViewModel.dismiss() },
+        title = { Text(text = stringResource(R.string.update_up_to_date_title)) },
+        text = { Text(text = stringResource(R.string.update_up_to_date_message)) },
+        confirmButton = {
+          TextButton(onClick = { resolvedViewModel.dismiss() }) {
+            Text(text = stringResource(android.R.string.ok))
+          }
+        }
+      )
+    }
+
     is AppUpdateUiState.Error -> {
       AlertDialog(
-        onDismissRequest = { viewModel.dismiss() },
+        onDismissRequest = { resolvedViewModel.dismiss() },
         title = { Text(text = stringResource(R.string.update_error_title)) },
         text = { Text(text = s.message) },
         confirmButton = {
-          TextButton(onClick = { viewModel.dismiss() }) {
+          TextButton(onClick = { resolvedViewModel.dismiss() }) {
             Text(text = stringResource(android.R.string.ok))
           }
         }

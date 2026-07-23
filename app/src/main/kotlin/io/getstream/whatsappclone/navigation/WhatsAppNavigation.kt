@@ -16,10 +16,12 @@
 
 package io.getstream.whatsappclone.navigation
 
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -39,6 +41,7 @@ import io.getstream.whatsappclone.settings.ui.PrivacySettingsScreen
 import io.getstream.whatsappclone.settings.ui.StorageSettingsScreen
 import io.getstream.whatsappclone.ui.WhatsAppTabPager
 import io.getstream.whatsappclone.ui.WhatsAppTopBar
+import io.getstream.whatsappclone.update.AppUpdateViewModel
 import io.getstream.whatsappclone.video.WhatsAppVideoCall
 import kotlinx.coroutines.launch
 
@@ -99,6 +102,8 @@ fun NavGraphBuilder.whatsAppHomeNavigation(
 
   composable(route = WhatsAppScreens.Settings.name) {
     val authViewModel: AuthViewModel = hiltViewModel()
+    val activity = LocalContext.current as ComponentActivity
+    val appUpdateViewModel: AppUpdateViewModel = hiltViewModel(activity)
     val scope = rememberCoroutineScope()
     BatchItSettingsScreen(
       onAccountClick = {
@@ -130,6 +135,9 @@ fun NavGraphBuilder.whatsAppHomeNavigation(
           authViewModel.deleteAccount()
           composeNavigator.navigateAndClearBackStack(WhatsAppScreens.Home.name)
         }
+      },
+      onCheckUpdateClick = {
+        appUpdateViewModel.checkForUpdate(userInitiated = true)
       }
     )
   }

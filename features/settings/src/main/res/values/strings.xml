@@ -30,6 +30,7 @@
   <string name="settings_starred_messages">Starred messages</string>
   <string name="settings_delete_account">Delete account</string>
   <string name="settings_sign_out">Sign out</string>
+  <string name="settings_check_update">Check for updates</string>
   <string name="settings_privacy_title">Privacy</string>
   <string name="settings_last_seen">Last seen</string>
   <string name="settings_last_seen_desc">Allow others to see when you were last online</string>

@@ -47,6 +47,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.SystemUpdateAlt
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,6 +83,7 @@ fun BatchItSettingsScreen(
   onStarredMessagesClick: () -> Unit = {},
   onDeleteAccountClick: () -> Unit = {},
   onSignOutClick: () -> Unit = {},
+  onCheckUpdateClick: () -> Unit = {},
   settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
   val profile by settingsViewModel.userProfile.collectAsStateWithLifecycle()
@@ -98,7 +100,8 @@ fun BatchItSettingsScreen(
     onHelpClick = onHelpClick,
     onStarredMessagesClick = onStarredMessagesClick,
     onDeleteAccountClick = onDeleteAccountClick,
-    onSignOutClick = onSignOutClick
+    onSignOutClick = onSignOutClick,
+    onCheckUpdateClick = onCheckUpdateClick
   )
 }
 
@@ -114,7 +117,8 @@ private fun BatchItSettingsContent(
   onHelpClick: () -> Unit,
   onStarredMessagesClick: () -> Unit,
   onDeleteAccountClick: () -> Unit,
-  onSignOutClick: () -> Unit
+  onSignOutClick: () -> Unit,
+  onCheckUpdateClick: () -> Unit
 ) {
   Column(
     modifier = Modifier
@@ -220,6 +224,11 @@ private fun BatchItSettingsContent(
       title = stringResource(id = R.string.settings_sign_out),
       onClick = onSignOutClick,
       tint = MaterialTheme.colorScheme.secondary
+    )
+    SettingsRow(
+      icon = Icons.Outlined.SystemUpdateAlt,
+      title = stringResource(id = R.string.settings_check_update),
+      onClick = onCheckUpdateClick
     )
 
     Spacer(modifier = Modifier.height(24.dp))
@@ -377,7 +386,8 @@ private fun BatchItSettingsScreenPreview() {
       onHelpClick = {},
       onStarredMessagesClick = {},
       onDeleteAccountClick = {},
-      onSignOutClick = {}
+      onSignOutClick = {},
+      onCheckUpdateClick = {}
     )
   }
 }
