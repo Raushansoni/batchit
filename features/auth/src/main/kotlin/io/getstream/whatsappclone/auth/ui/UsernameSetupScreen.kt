@@ -42,18 +42,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.getstream.whatsappclone.auth.AuthRepository
 import io.getstream.whatsappclone.auth.R
-import io.getstream.whatsappclone.designsystem.theme.GREEN500
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.designsystem.theme.getTitleColor
 
 @Composable
-fun OtpVerifyScreen(
-  phone: String,
+fun UsernameSetupScreen(
   isSubmitting: Boolean,
-  onVerify: (code: String) -> Unit
+  onSave: (username: String) -> Unit
 ) {
-  var code by remember { mutableStateOf("") }
+  var username by remember { mutableStateOf("") }
+  val normalized = AuthRepository.normalizeUsername(username)
+  val isValid = Regex("^[a-zA-Z0-9_]{3,20}$").matches(normalized)
 
   Column(
     modifier = Modifier
@@ -63,46 +64,47 @@ fun OtpVerifyScreen(
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
     Text(
-      text = stringResource(id = R.string.auth_otp_title),
+      text = stringResource(id = R.string.auth_username_title),
       style = MaterialTheme.typography.headlineSmall,
       color = getTitleColor()
     )
     Spacer(modifier = Modifier.height(8.dp))
     Text(
-      text = stringResource(id = R.string.auth_otp_subtitle),
+      text = stringResource(id = R.string.auth_username_subtitle),
       style = MaterialTheme.typography.bodyMedium,
       color = MaterialTheme.colorScheme.onTertiary
-    )
-    Spacer(modifier = Modifier.height(4.dp))
-    Text(
-      text = phone,
-      style = MaterialTheme.typography.bodyLarge,
-      color = GREEN500
     )
     Spacer(modifier = Modifier.height(32.dp))
 
     OutlinedTextField(
       modifier = Modifier.fillMaxWidth(),
-      value = code,
-      onValueChange = { code = it.filter { char -> char.isDigit() }.take(6) },
-      label = { Text(text = stringResource(id = R.string.auth_otp_hint)) },
+      value = username,
+      onValueChange = { value ->
+        if (value.length <= 20 && value.all { it.isLetterOrDigit() || it == '_' }) {
+          username = value
+        }
+      },
+      label = { Text(text = stringResource(id = R.string.auth_username_hint)) },
+      supportingText = {
+        Text(text = stringResource(id = R.string.auth_username_rules))
+      },
       singleLine = true,
-      keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+      keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
       enabled = !isSubmitting
     )
 
     Spacer(modifier = Modifier.height(24.dp))
 
     if (isSubmitting) {
-      CircularProgressIndicator(color = GREEN500)
+      CircularProgressIndicator(color = MaterialTheme.colorScheme.secondary)
     } else {
       Button(
         modifier = Modifier.fillMaxWidth(),
-        onClick = { onVerify(code) },
-        colors = ButtonDefaults.buttonColors(containerColor = GREEN500),
-        enabled = code.length >= 6
+        onClick = { onSave(normalized) },
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+        enabled = isValid
       ) {
-        Text(text = stringResource(id = R.string.auth_verify), color = Color.White)
+        Text(text = stringResource(id = R.string.auth_continue), color = MaterialTheme.colorScheme.onSecondary)
       }
     }
   }
@@ -110,12 +112,11 @@ fun OtpVerifyScreen(
 
 @Preview
 @Composable
-private fun OtpVerifyScreenPreview() {
+private fun UsernameSetupScreenPreview() {
   WhatsAppCloneComposeTheme {
-    OtpVerifyScreen(
-      phone = "+15551234567",
+    UsernameSetupScreen(
       isSubmitting = false,
-      onVerify = {}
+      onSave = {}
     )
   }
 }

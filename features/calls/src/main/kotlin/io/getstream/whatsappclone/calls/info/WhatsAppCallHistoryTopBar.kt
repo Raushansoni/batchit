@@ -16,14 +16,15 @@
 
 package io.getstream.whatsappclone.calls.info
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.TopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -32,50 +33,58 @@ import androidx.compose.ui.unit.dp
 import io.getstream.whatsappclone.calls.R
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
+import io.getstream.whatsappclone.designsystem.theme.getChromeContentColor
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WhatsAppCallHistoryTopBar(
   onBackClick: () -> Unit
 ) {
+  val chrome = getChromeContentColor()
+
   TopAppBar(
     modifier = Modifier.fillMaxWidth(),
     navigationIcon = {
-      Icon(
-        modifier = Modifier
-          .size(26.dp)
-          .clickable {
-            onBackClick()
-          },
-        imageVector = WhatsAppIcons.ArrowBack,
-        tint = MaterialTheme.colorScheme.tertiary,
-        contentDescription = null
-      )
+      IconButton(onClick = onBackClick) {
+        Icon(
+          modifier = Modifier.size(24.dp),
+          imageVector = WhatsAppIcons.ArrowBack,
+          tint = chrome,
+          contentDescription = null
+        )
+      }
     },
     title = {
       Text(
         text = stringResource(id = R.string.call_info),
-        color = MaterialTheme.colorScheme.tertiary,
+        color = chrome,
         style = MaterialTheme.typography.titleLarge
       )
     },
     actions = {
-      Icon(
-        modifier = Modifier.size(26.dp),
-        imageVector = WhatsAppIcons.Message,
-        tint = MaterialTheme.colorScheme.tertiary,
-        contentDescription = null
-      )
-
-      Spacer(modifier = Modifier.size(16.dp))
-
-      Icon(
-        modifier = Modifier.size(26.dp),
-        imageVector = WhatsAppIcons.MoreVert,
-        tint = MaterialTheme.colorScheme.tertiary,
-        contentDescription = null
-      )
+      IconButton(onClick = {}) {
+        Icon(
+          modifier = Modifier.size(24.dp),
+          imageVector = WhatsAppIcons.Message,
+          tint = chrome,
+          contentDescription = null
+        )
+      }
+      IconButton(onClick = {}) {
+        Icon(
+          modifier = Modifier.size(24.dp),
+          imageVector = WhatsAppIcons.MoreVert,
+          tint = chrome,
+          contentDescription = null
+        )
+      }
     },
-    backgroundColor = MaterialTheme.colorScheme.primary
+    colors = TopAppBarDefaults.topAppBarColors(
+      containerColor = MaterialTheme.colorScheme.primary,
+      titleContentColor = chrome,
+      navigationIconContentColor = chrome,
+      actionIconContentColor = chrome
+    )
   )
 }
 

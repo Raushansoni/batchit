@@ -41,7 +41,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.getstream.whatsappclone.auth.R
-import io.getstream.whatsappclone.designsystem.theme.GREEN500
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.designsystem.theme.getTitleColor
 
@@ -84,15 +83,15 @@ fun ProfileSetupScreen(
     Spacer(modifier = Modifier.height(24.dp))
 
     if (isSubmitting) {
-      CircularProgressIndicator(color = GREEN500)
+      CircularProgressIndicator(color = MaterialTheme.colorScheme.secondary)
     } else {
       Button(
         modifier = Modifier.fillMaxWidth(),
         onClick = { onSave(name) },
-        colors = ButtonDefaults.buttonColors(containerColor = GREEN500),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
         enabled = name.isNotBlank()
       ) {
-        Text(text = stringResource(id = R.string.auth_save), color = Color.White)
+        Text(text = stringResource(id = R.string.auth_save), color = MaterialTheme.colorScheme.onSecondary)
       }
     }
   }

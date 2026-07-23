@@ -34,23 +34,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
-import io.getstream.whatsappclone.designsystem.theme.DARK_GREEN300
-import io.getstream.whatsappclone.designsystem.theme.GREEN500
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun WhatsAppCamera() {
+fun WhatsAppCamera(
+  isActive: Boolean = true
+) {
   val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
 
-  LaunchedEffect(Unit) {
-    if (!cameraPermission.status.isGranted) {
+  LaunchedEffect(isActive) {
+    if (isActive && !cameraPermission.status.isGranted) {
       cameraPermission.launchPermissionRequest()
     }
   }
@@ -58,7 +57,7 @@ fun WhatsAppCamera() {
   Box(
     modifier = Modifier
       .fillMaxSize()
-      .background(DARK_GREEN300),
+      .background(MaterialTheme.colorScheme.background),
     contentAlignment = Alignment.Center
   ) {
     Column(
@@ -69,13 +68,13 @@ fun WhatsAppCamera() {
       Box(
         modifier = Modifier
           .size(88.dp)
-          .background(GREEN500, CircleShape),
+          .background(MaterialTheme.colorScheme.secondary, CircleShape),
         contentAlignment = Alignment.Center
       ) {
         Icon(
           imageVector = WhatsAppIcons.Camera,
           contentDescription = null,
-          tint = Color.White,
+          tint = MaterialTheme.colorScheme.onSecondary,
           modifier = Modifier.size(40.dp)
         )
       }
@@ -87,7 +86,7 @@ fun WhatsAppCamera() {
           "Allow camera access to take photos and videos for chats and Status."
         },
         style = MaterialTheme.typography.bodyLarge,
-        color = Color.White,
+        color = MaterialTheme.colorScheme.onBackground,
         textAlign = TextAlign.Center
       )
     }

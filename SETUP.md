@@ -1,61 +1,81 @@
 # BatchIt Setup Guide
 
-Complete these steps before running the production app.
+## Free production (default — no Firebase billing)
 
-## 1. Stream Chat + Video
+Stack:
 
-1. Sign up at https://dashboard.getstream.io
-2. Create an app (Chat + Video enabled)
-3. Copy the **API Key** into `secrets.properties`:
+- **Auth:** Google Sign-In (Spark / free) + username after first login
+- **Tokens:** Cloudflare Worker (`workers/stream-token`)
+- **Chat:** Stream Chat + Video (Maker free tier)
+
+### 1. Stream API key
+
+Create an app at https://dashboard.getstream.io and put the **API key** in root `secrets.properties`:
 
 ```properties
-STREAM_API_KEY=your_real_api_key_here
+STREAM_API_KEY=your_stream_api_key
+STREAM_TOKEN_URL=https://batchit-stream-token.<your-subdomain>.workers.dev
+GOOGLE_WEB_CLIENT_ID=your_web_client_id.apps.googleusercontent.com
 ```
 
-4. Copy the **API Secret** — use it only in Cloud Functions (never in the Android app)
-5. Optional: apply for a [Maker Account](https://getstream.io/maker-account/) (up to 2,000 MAU free)
+Keep the **API secret** for the Worker only (never put secrets in this markdown file).
 
-## 2. Firebase
+### 2. Firebase (already linked)
 
-1. Create a project at https://console.firebase.google.com named `batchit-prod`
-2. Add an Android app with package name: `com.batchit.app`
-3. Download `google-services.json` into `app/google-services.json` (replace the placeholder)
-4. Enable **Phone Authentication** (Authentication → Sign-in method)
-5. Enable **Cloud Firestore**, **Cloud Storage**, and **Cloud Functions** (Blaze plan required for Functions)
-6. Enable **Cloud Messaging** for push notifications
-7. Upload the Firebase service-account JSON to the Stream Dashboard (Chat → Push → Firebase)
+- Project: `batchit-prod`
+- Android package: `com.batchit.app`
+- File: `app/google-services.json`
+- Google Sign-In: enabled (and Email/Password kept as fallback)
 
-## 3. Cloud Functions (Stream token server)
+Confirm in Console:  
+https://console.firebase.google.com/project/batchit-prod/authentication/providers
+
+#### Google Web Client ID
+
+1. Open Firebase Console → Project settings → Your apps → Web app  
+   **or** Google Cloud Console → APIs & Services → Credentials
+2. Copy the **Web client** OAuth 2.0 Client ID (`….apps.googleusercontent.com`)
+3. Paste it as `GOOGLE_WEB_CLIENT_ID` in `secrets.properties`
+
+Also re-download `app/google-services.json` after enabling Google Sign-In / adding SHA-1 so OAuth clients are present.
+
+Debug SHA-1 is already registered for this machine’s debug keystore.
+
+### 3. Deploy the free token Worker
 
 ```bash
-cd functions
+cd workers/stream-token
 npm install
-firebase login
-firebase use batchit-prod
-# Set secrets:
-firebase functions:config:set stream.key="YOUR_API_KEY" stream.secret="YOUR_API_SECRET"
-# Or use modern secrets:
-# firebase functions:secrets:set STREAM_API_KEY
-# firebase functions:secrets:set STREAM_API_SECRET
-firebase deploy --only functions
+npx wrangler login
+npx wrangler secret put STREAM_API_KEY
+npx wrangler secret put STREAM_API_SECRET
+npx wrangler secret put FIREBASE_PROJECT_ID
+# when prompted for FIREBASE_PROJECT_ID, enter: batchit-prod
+npx wrangler deploy
 ```
 
-## 4. Google Play Console
+Each `secret put` command asks you to paste the value interactively.  
+Paste the printed Worker URL into `STREAM_TOKEN_URL` in `secrets.properties` (no trailing slash).
 
-1. Pay the one-time $25 developer fee at https://play.google.com/console
-2. Create app listing **BatchIt** (Communication category)
-3. Follow `docs/PLAY_STORE_CHECKLIST.md`
+### 4. Run the Android app
 
-## 5. Run locally
+1. Sync Gradle → Run
+2. Tap **Continue with Google**
+3. Pick a unique username (3–20 chars)
 
-1. Open the project in Android Studio (Ladybug+)
-2. Sync Gradle
-3. Run on an emulator (API 26+) or physical device
-4. Demo mode: until Firebase Phone Auth is configured, the app can use Stream `devToken` via `BatchItAuthConfig.USE_DEMO_AUTH`
+`BatchItAuthConfig.USE_DEMO_AUTH` is `false`. For offline Stream-only testing, set it back to `true` temporarily.
 
-## Demo vs Production
+---
 
-| Mode | When | Auth |
-|------|------|------|
-| Demo | `USE_DEMO_AUTH = true` | Hard-coded Stream user + `devToken` |
-| Production | `USE_DEMO_AUTH = false` + Firebase configured | Phone OTP → Cloud Function token |
+## What this does not include (needs Blaze / paid)
+
+| Feature | Why |
+|---------|-----|
+| Phone OTP | SMS billing |
+| Firebase Cloud Functions | Blaze plan |
+
+---
+
+## Optional: Blaze / Phone later
+
+See older `functions/` folder if you upgrade to Blaze and want Phone OTP + Callable Functions instead of the Worker.

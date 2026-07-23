@@ -36,27 +36,33 @@ class StreamChatInitializer : Initializer<Unit> {
   override fun create(context: Context) {
     streamLog { "StreamChatInitializer is initialized" }
 
-    val logLevel = if (BuildConfig.DEBUG) ChatLogLevel.ALL else ChatLogLevel.NOTHING
+    // ALL floods the main thread during scroll/sync and causes stutter in debug.
+    val logLevel = if (BuildConfig.DEBUG) ChatLogLevel.ERROR else ChatLogLevel.NOTHING
     val offlinePluginFactory = StreamOfflinePluginFactory(
       appContext = context
     )
     val statePluginFactory = StreamStatePluginFactory(
       config = StatePluginConfig(
         backgroundSyncEnabled = true,
-        userPresence = true
+        userPresence = false
       ),
       appContext = context
     )
 
-    val notificationConfig = NotificationConfig(
-      pushNotificationsEnabled = true,
-      pushDeviceGenerators = listOf(
-        FirebasePushDeviceGenerator(
-          context = context,
-          providerName = "firebase"
+    // Push is best-effort: placeholder Firebase configs must not crash app open.
+    val notificationConfig = try {
+      NotificationConfig(
+        pushNotificationsEnabled = true,
+        pushDeviceGenerators = listOf(
+          FirebasePushDeviceGenerator(
+            providerName = "firebase"
+          )
         )
       )
-    )
+    } catch (error: Throwable) {
+      streamLog { "Firebase push disabled: ${error.message}" }
+      NotificationConfig(pushNotificationsEnabled = false)
+    }
 
     ChatClient.Builder(BuildConfig.STREAM_API_KEY, context)
       .withPlugins(offlinePluginFactory, statePluginFactory)

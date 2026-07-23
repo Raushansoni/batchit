@@ -39,8 +39,17 @@ dependencies {
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.functions)
 
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services.auth)
+  implementation(libs.google.id)
+  implementation(libs.androidx.activity.compose)
+  implementation(libs.accompanist.permissions)
+
   implementation(libs.stream.chat.client)
   implementation(libs.stream.video.core)
+
+  implementation(libs.okhttp.logging)
+  implementation(libs.okhttp)
 
   implementation(libs.androidx.lifecycle.runtimeCompose)
   implementation(libs.androidx.lifecycle.viewModelCompose)

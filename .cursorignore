@@ -1,0 +1,68 @@
+﻿# Build outputs & caches (keep Cursor index lean)
+**/build/
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+bin/
+gen/
+out/
+captures/
+.navigation/
+
+# Packaged Android artifacts
+*.apk
+*.ap_
+*.aab
+*.aar
+*.dex
+*.class
+
+# IDE / editor
+.idea/
+*.iml
+.vscode/
+.cursor/
+
+# Secrets & local machine config
+local.properties
+secrets.properties
+*.keystore
+*.jks
+*.p12
+google-services.json
+**/google-services.json
+service-account*.json
+*-firebase-adminsdk*.json
+functions/.env
+functions/.runtimeconfig.json
+
+# Dependencies & Firebase local
+functions/node_modules/
+.firebase/
+*.log
+
+# Large / non-source media (not useful for coding context)
+previews/
+figures/
+*.mp4
+*.webm
+*.mov
+*.psd
+*.sketch
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Misc
+agent-tools/
+docs/api
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+*.swp
+*.swo
+*~

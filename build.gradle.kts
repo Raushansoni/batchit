@@ -5,6 +5,23 @@ buildscript {
   }
 }
 
+subprojects {
+  configurations.configureEach {
+    resolutionStrategy {
+      // Keep Stream Log / Push aligned with Chat SDK 6.4.4. Newer push (1.3.x)
+      // upgrades stream-log to 1.3.x (moved AndroidStreamLogger package) and
+      // registers incompatible PushDelegateProvider entries.
+      force("io.getstream:stream-log:1.1.4")
+      force("io.getstream:stream-log-android:1.1.4")
+      force("io.getstream:stream-android-push:1.1.8")
+      force("io.getstream:stream-android-push-delegate:1.1.8")
+      force("io.getstream:stream-android-push-firebase:1.1.8")
+      force("io.getstream:stream-android-push-permissions:1.1.8")
+      force("io.getstream:stream-android-push-permissions-snackbar:1.1.8")
+    }
+  }
+}
+
 plugins {
   alias(libs.plugins.android.application) apply false
   alias(libs.plugins.android.library) apply false

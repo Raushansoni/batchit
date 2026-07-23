@@ -16,14 +16,19 @@
 -->
 <resources>
   <string name="auth_welcome_title">Welcome to BatchIt</string>
-  <string name="auth_welcome_subtitle">Enter your phone number to get started</string>
-  <string name="auth_phone_hint">Phone number</string>
+  <string name="auth_welcome_subtitle">Sign in with Google to start chatting</string>
+  <string name="auth_google_sign_in">Continue with Google</string>
   <string name="auth_continue">Continue</string>
   <string name="auth_demo_continue">Continue as demo user</string>
-  <string name="auth_otp_title">Verify your number</string>
-  <string name="auth_otp_subtitle">Enter the 6-digit code we sent you</string>
-  <string name="auth_otp_hint">Verification code</string>
-  <string name="auth_verify">Verify</string>
+  <string name="auth_username_title">Choose a username</string>
+  <string name="auth_username_subtitle">This is how friends will find you on BatchIt</string>
+  <string name="auth_username_hint">Username</string>
+  <string name="auth_username_rules">3–20 characters: letters, numbers, underscore</string>
+  <string name="auth_permissions_title">Allow permissions</string>
+  <string name="auth_permissions_subtitle">BatchIt needs a few permissions to chat, call, and notify you.</string>
+  <string name="auth_permissions_list">• Camera — photos, status, video calls\n• Microphone — voice and video calls\n• Notifications — new message alerts\n• Contacts — find friends on BatchIt\n• Nearby devices — Bluetooth audio on calls</string>
+  <string name="auth_permissions_allow">Allow permissions</string>
+  <string name="auth_permissions_skip">Not now</string>
   <string name="auth_profile_title">Profile info</string>
   <string name="auth_profile_subtitle">Please provide your name</string>
   <string name="auth_name_hint">Your name</string>

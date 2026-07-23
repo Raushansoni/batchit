@@ -19,6 +19,8 @@ package io.getstream.whatsappclone
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import dagger.hilt.android.AndroidEntryPoint
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.ui.WhatsAppCloneMain
@@ -31,7 +33,9 @@ class MainActivity : ComponentActivity() {
   internal lateinit var appComposeNavigator: AppComposeNavigator
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    WindowCompat.setDecorFitsSystemWindows(window, true)
 
     setContent { WhatsAppCloneMain(appComposeNavigator) }
   }

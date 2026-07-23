@@ -16,9 +16,10 @@
 
 package io.getstream.whatsappclone.auth
 
-import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,9 +30,9 @@ import kotlinx.coroutines.launch
 
 sealed interface AuthUiState {
   data object Loading : AuthUiState
-  data object PhoneInput : AuthUiState
-  data class OtpInput(val phone: String) : AuthUiState
-  data object ProfileSetup : AuthUiState
+  data object GoogleSignIn : AuthUiState
+  data object UsernameSetup : AuthUiState
+  data object PermissionsSetup : AuthUiState
   data object Authenticated : AuthUiState
   data class Error(val message: String) : AuthUiState
 }
@@ -49,43 +50,67 @@ class AuthViewModel @Inject constructor(
 
   init {
     viewModelScope.launch {
-      if (authRepository.isSessionActive()) {
-        if (BatchItAuthConfig.USE_DEMO_AUTH) {
-          authRepository.signInDemo()
-        }
-        _uiState.value = AuthUiState.Authenticated
+      if (!authRepository.isSessionActive() && Firebase.auth.currentUser == null) {
+        _uiState.value = AuthUiState.GoogleSignIn
+        return@launch
+      }
+
+      if (BatchItAuthConfig.USE_DEMO_AUTH) {
+        authRepository.signInDemo()
+          .onSuccess { _uiState.value = nextOnboardingState() }
+          .onFailure { error ->
+            authRepository.signOut()
+            _uiState.value = AuthUiState.Error(
+              error.message
+                ?: "Could not restore session. Check your Stream API key in secrets.properties."
+            )
+          }
       } else {
-        _uiState.value = AuthUiState.PhoneInput
+        authRepository.restoreFirebaseSession()
+          .onSuccess { _uiState.value = nextOnboardingState() }
+          .onFailure { error ->
+            authRepository.signOut()
+            _uiState.value = AuthUiState.Error(
+              error.message
+                ?: "Could not restore session. Deploy the token Worker and check STREAM_TOKEN_URL."
+            )
+          }
       }
     }
 
     viewModelScope.launch {
       authRepository.isLoggedIn.collect { loggedIn ->
         if (!loggedIn && _uiState.value is AuthUiState.Authenticated) {
-          _uiState.value = AuthUiState.PhoneInput
+          _uiState.value = AuthUiState.GoogleSignIn
         }
       }
     }
   }
 
-  fun continueWithPhone(phone: String, activity: Activity) {
+  fun onGoogleIdToken(idToken: String) {
     viewModelScope.launch {
       _isSubmitting.value = true
-      val result = authRepository.sendOtp(phone.trim(), activity)
+      val result = authRepository.signInWithGoogleIdToken(idToken)
       _isSubmitting.value = false
-
       result
-        .onSuccess {
-          if (BatchItAuthConfig.USE_DEMO_AUTH) {
-            _uiState.value = AuthUiState.ProfileSetup
-          } else {
-            _uiState.value = AuthUiState.OtpInput(phone.trim())
-          }
-        }
+        .onSuccess { _uiState.value = nextOnboardingState() }
         .onFailure { error ->
-          _uiState.value = AuthUiState.Error(error.message ?: "Failed to send OTP")
+          _uiState.value = AuthUiState.Error(error.message ?: "Google sign-in failed")
         }
     }
+  }
+
+  fun onGoogleSignInCancelled() {
+    _isSubmitting.value = false
+  }
+
+  fun onGoogleSignInError(message: String) {
+    _isSubmitting.value = false
+    _uiState.value = AuthUiState.Error(message)
+  }
+
+  fun setSubmitting(value: Boolean) {
+    _isSubmitting.value = value
   }
 
   fun continueAsDemo() {
@@ -93,53 +118,52 @@ class AuthViewModel @Inject constructor(
       _isSubmitting.value = true
       val result = authRepository.signInDemo()
       _isSubmitting.value = false
-
       result
-        .onSuccess { _uiState.value = AuthUiState.ProfileSetup }
+        .onSuccess { _uiState.value = nextOnboardingState() }
         .onFailure { error ->
           _uiState.value = AuthUiState.Error(error.message ?: "Demo sign-in failed")
         }
     }
   }
 
-  fun verifyOtp(code: String) {
+  fun saveUsername(username: String) {
     viewModelScope.launch {
       _isSubmitting.value = true
-      val result = authRepository.verifyOtp(code.trim())
+      val result = authRepository.saveUsername(username)
       _isSubmitting.value = false
-
       result
-        .onSuccess { _uiState.value = AuthUiState.ProfileSetup }
+        .onSuccess { _uiState.value = nextOnboardingState() }
         .onFailure { error ->
-          _uiState.value = AuthUiState.Error(error.message ?: "OTP verification failed")
+          _uiState.value = AuthUiState.Error(error.message ?: "Failed to save username")
         }
     }
   }
 
-  fun saveProfile(name: String) {
-    viewModelScope.launch {
-      _isSubmitting.value = true
-      val result = authRepository.saveProfile(name.trim())
-      _isSubmitting.value = false
-
-      result
-        .onSuccess { _uiState.value = AuthUiState.Authenticated }
-        .onFailure { error ->
-          _uiState.value = AuthUiState.Error(error.message ?: "Failed to save profile")
-        }
-    }
+  fun onPermissionsFinished() {
+    authRepository.markPermissionsPrompted()
+    _uiState.value = AuthUiState.Authenticated
   }
 
   fun clearError() {
     _uiState.update { current ->
-      if (current is AuthUiState.Error) AuthUiState.PhoneInput else current
+      if (current is AuthUiState.Error) AuthUiState.GoogleSignIn else current
     }
   }
 
   fun signOut() {
     viewModelScope.launch {
       authRepository.signOut()
-      _uiState.value = AuthUiState.PhoneInput
+      _uiState.value = AuthUiState.GoogleSignIn
     }
+  }
+
+  private fun nextOnboardingState(): AuthUiState {
+    if (!BatchItAuthConfig.USE_DEMO_AUTH && !authRepository.hasUsername()) {
+      return AuthUiState.UsernameSetup
+    }
+    if (!authRepository.hasPromptedPermissions()) {
+      return AuthUiState.PermissionsSetup
+    }
+    return AuthUiState.Authenticated
   }
 }

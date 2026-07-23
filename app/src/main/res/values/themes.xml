@@ -17,6 +17,8 @@
 <resources>
 
   <style name="Theme.WhatsAppCloneCompose" parent="Theme.AppCompat.DayNight.NoActionBar">
-    <item name="android:statusBarColor">@color/green_darker</item>
+    <item name="android:statusBarColor">@color/green_dark</item>
+    <item name="android:navigationBarColor">@color/channel_background</item>
+    <item name="android:windowLightStatusBar">false</item>
   </style>
 </resources>

@@ -38,7 +38,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.getstream.whatsappclone.designsystem.theme.GREEN500
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.designsystem.theme.getTitleColor
 import io.getstream.whatsappclone.settings.PrivacySettings
@@ -140,8 +139,8 @@ private fun PrivacyToggleRow(
       checked = checked,
       onCheckedChange = onCheckedChange,
       colors = SwitchDefaults.colors(
-        checkedThumbColor = GREEN500,
-        checkedTrackColor = GREEN500.copy(alpha = 0.45f)
+        checkedThumbColor = MaterialTheme.colorScheme.secondary,
+        checkedTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f)
       )
     )
   }

@@ -16,12 +16,17 @@
 
 package io.getstream.whatsappclone.ui
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
@@ -29,45 +34,61 @@ import io.getstream.whatsappclone.auth.AuthUiState
 import io.getstream.whatsappclone.auth.AuthViewModel
 import io.getstream.whatsappclone.auth.ui.AuthFlow
 import io.getstream.whatsappclone.designsystem.component.WhatsAppCloneBackground
+import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppNavHost
+import io.getstream.whatsappclone.settings.SettingsViewModel
 
 @Composable
 fun WhatsAppCloneMain(
   composeNavigator: AppComposeNavigator,
-  authViewModel: AuthViewModel = hiltViewModel()
+  authViewModel: AuthViewModel = hiltViewModel(),
+  settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
-  WhatsAppCloneComposeTheme {
-    val authState by authViewModel.uiState.collectAsStateWithLifecycle()
-    var isAuthenticated by remember { mutableStateOf(false) }
+  val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+  val darkTheme = themeMode.resolveIsDark(isSystemInDarkTheme())
 
+  WhatsAppCloneComposeTheme(darkTheme = darkTheme) {
+    SyncSystemBars(darkTheme = darkTheme)
+
+    val authState by authViewModel.uiState.collectAsStateWithLifecycle()
+    // Keep NavHost alive across recompositions once the user is in; avoid AnimatedContent teardown.
+    var sessionReady by remember { mutableStateOf(false) }
     LaunchedEffect(authState) {
-      if (authState is AuthUiState.Authenticated) {
-        isAuthenticated = true
-      }
-      if (authState is AuthUiState.PhoneInput) {
-        isAuthenticated = false
+      when (authState) {
+        is AuthUiState.Authenticated -> sessionReady = true
+        is AuthUiState.GoogleSignIn,
+        is AuthUiState.Error -> sessionReady = false
+        else -> Unit
       }
     }
 
     WhatsAppCloneBackground {
-      if (!isAuthenticated && authState !is AuthUiState.Authenticated) {
-        AuthFlow(
-          onAuthenticated = { isAuthenticated = true },
-          authViewModel = authViewModel
-        )
-      } else {
-        val navHostController = rememberNavController()
-
-        LaunchedEffect(Unit) {
-          composeNavigator.handleNavigationCommands(navHostController)
+      when {
+        authState is AuthUiState.Loading && !sessionReady -> {
+          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            WhatsAppLoadingIndicator()
+          }
         }
 
-        WhatsAppNavHost(
-          navHostController = navHostController,
-          composeNavigator = composeNavigator
-        )
+        sessionReady -> {
+          val navHostController = rememberNavController()
+          LaunchedEffect(navHostController) {
+            composeNavigator.handleNavigationCommands(navHostController)
+          }
+          WhatsAppNavHost(
+            navHostController = navHostController,
+            composeNavigator = composeNavigator
+          )
+        }
+
+        else -> {
+          AuthFlow(
+            onAuthenticated = {},
+            authViewModel = authViewModel
+          )
+        }
       }
     }
   }

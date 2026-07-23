@@ -168,7 +168,8 @@ class StatusRepository @Inject constructor() {
       db.collection(COLLECTION).document(statusId)
         .update("viewedBy", FieldValue.arrayUnion(uid))
         .awaitTask()
-      refresh()
+      // Patch local state — avoid a full 100-doc refresh on every view.
+      patchViewedLocally(statusId, uid)
       Result.success(Unit)
     } catch (e: Exception) {
       logger.e(e) { "markViewed failed" }
@@ -176,6 +177,18 @@ class StatusRepository @Inject constructor() {
       updateDemoViewed(statusId, uid)
       Result.success(Unit)
     }
+  }
+
+  private fun patchViewedLocally(statusId: String, uid: String) {
+    fun List<StatusItem>.patched(): List<StatusItem> = map { item ->
+      if (item.id == statusId && uid !in item.viewedBy) {
+        item.copy(viewedBy = item.viewedBy + uid)
+      } else {
+        item
+      }
+    }
+    _myStatuses.value = _myStatuses.value.patched()
+    _contactStatuses.value = _contactStatuses.value.patched()
   }
 
   private suspend fun persistStatus(item: StatusItem): Result<StatusItem> {

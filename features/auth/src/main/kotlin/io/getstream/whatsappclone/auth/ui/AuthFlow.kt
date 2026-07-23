@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,7 +35,6 @@ import io.getstream.whatsappclone.auth.AuthUiState
 import io.getstream.whatsappclone.auth.AuthViewModel
 import io.getstream.whatsappclone.auth.R
 import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator
-import io.getstream.whatsappclone.designsystem.theme.GREEN500
 import io.getstream.whatsappclone.designsystem.theme.getTitleColor
 
 @Composable
@@ -45,6 +45,12 @@ fun AuthFlow(
   val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
   val isSubmitting by authViewModel.isSubmitting.collectAsStateWithLifecycle()
 
+  LaunchedEffect(uiState) {
+    if (uiState is AuthUiState.Authenticated) {
+      onAuthenticated()
+    }
+  }
+
   when (val state = uiState) {
     AuthUiState.Loading -> {
       Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -52,31 +58,34 @@ fun AuthFlow(
       }
     }
 
-    AuthUiState.PhoneInput -> {
-      PhoneAuthScreen(
+    AuthUiState.GoogleSignIn -> {
+      GoogleAuthScreen(
         isSubmitting = isSubmitting,
-        onContinue = authViewModel::continueWithPhone,
-        onDemoContinue = authViewModel::continueAsDemo
+        onGoogleIdToken = authViewModel::onGoogleIdToken,
+        onError = authViewModel::onGoogleSignInError,
+        onCancelled = authViewModel::onGoogleSignInCancelled,
+        onDemoContinue = authViewModel::continueAsDemo,
+        onSubmittingChange = authViewModel::setSubmitting
       )
     }
 
-    is AuthUiState.OtpInput -> {
-      OtpVerifyScreen(
-        phone = state.phone,
+    AuthUiState.UsernameSetup -> {
+      UsernameSetupScreen(
         isSubmitting = isSubmitting,
-        onVerify = authViewModel::verifyOtp
+        onSave = authViewModel::saveUsername
       )
     }
 
-    AuthUiState.ProfileSetup -> {
-      ProfileSetupScreen(
-        isSubmitting = isSubmitting,
-        onSave = authViewModel::saveProfile
+    AuthUiState.PermissionsSetup -> {
+      PermissionsSetupScreen(
+        onFinished = authViewModel::onPermissionsFinished
       )
     }
 
     AuthUiState.Authenticated -> {
-      onAuthenticated()
+      Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        WhatsAppLoadingIndicator()
+      }
     }
 
     is AuthUiState.Error -> {
@@ -97,7 +106,7 @@ fun AuthFlow(
             .padding(bottom = 32.dp),
           onClick = authViewModel::clearError
         ) {
-          Text(text = stringResource(id = R.string.auth_continue), color = GREEN500)
+          Text(text = stringResource(id = R.string.auth_continue), color = MaterialTheme.colorScheme.secondary)
         }
       }
     }

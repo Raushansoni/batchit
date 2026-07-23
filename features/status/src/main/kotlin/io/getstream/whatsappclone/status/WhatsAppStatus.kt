@@ -16,6 +16,12 @@
 
 package io.getstream.whatsappclone.status
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,11 +39,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,17 +51,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.skydoves.landscapist.glide.GlideImage
+import io.getstream.whatsappclone.designsystem.component.BatchItAvatar
+import io.getstream.whatsappclone.designsystem.component.BatchItFab
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
+import io.getstream.whatsappclone.designsystem.theme.BatchItMotion
 import io.getstream.whatsappclone.designsystem.theme.GREEN400
-import io.getstream.whatsappclone.designsystem.theme.GREEN500
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.designsystem.theme.getTitleColor
 import io.getstream.whatsappclone.status.model.StatusItem
@@ -70,10 +75,15 @@ private sealed interface StatusOverlay {
 
 @Composable
 fun WhatsAppStatus(
+  isActive: Boolean = true,
   viewModel: StatusViewModel = hiltViewModel()
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   var overlay by remember { mutableStateOf<StatusOverlay>(StatusOverlay.None) }
+
+  LaunchedEffect(isActive) {
+    if (isActive) viewModel.onTabActive()
+  }
 
   Box(modifier = Modifier.fillMaxSize()) {
     StatusListScreen(
@@ -93,33 +103,42 @@ fun WhatsAppStatus(
       onFabClick = { overlay = StatusOverlay.Composer }
     )
 
-    when (val current = overlay) {
-      StatusOverlay.None -> Unit
-      StatusOverlay.Composer -> {
-        StatusComposerScreen(
-          isSaving = uiState.isSaving,
-          onClose = { overlay = StatusOverlay.None },
-          onPostText = { text ->
-            viewModel.createTextStatus(text) {
-              overlay = StatusOverlay.None
-            }
-          },
-          onPostImage = { uri, caption ->
-            viewModel.createImageStatus(uri, caption) {
-              overlay = StatusOverlay.None
-            }
-          }
-        )
-      }
-      is StatusOverlay.Viewer -> {
-        val statuses = viewModel.statusesForUser(current.userId)
-        if (statuses.isNotEmpty()) {
-          StatusViewerScreen(
-            statuses = statuses,
-            initialIndex = current.startIndex.coerceIn(0, statuses.lastIndex),
+    AnimatedContent(
+      targetState = overlay,
+      transitionSpec = {
+        (fadeIn(BatchItMotion.MediumTween) + slideInVertically { it / 8 }) togetherWith
+          (fadeOut(BatchItMotion.FastTween) + slideOutVertically { it / 10 })
+      },
+      label = "statusOverlay"
+    ) { current ->
+      when (current) {
+        StatusOverlay.None -> Unit
+        StatusOverlay.Composer -> {
+          StatusComposerScreen(
+            isSaving = uiState.isSaving,
             onClose = { overlay = StatusOverlay.None },
-            onStatusViewed = viewModel::markViewed
+            onPostText = { text ->
+              viewModel.createTextStatus(text) {
+                overlay = StatusOverlay.None
+              }
+            },
+            onPostImage = { uri, caption ->
+              viewModel.createImageStatus(uri, caption) {
+                overlay = StatusOverlay.None
+              }
+            }
           )
+        }
+        is StatusOverlay.Viewer -> {
+          val statuses = viewModel.statusesForUser(current.userId)
+          if (statuses.isNotEmpty()) {
+            StatusViewerScreen(
+              statuses = statuses,
+              initialIndex = current.startIndex.coerceIn(0, statuses.lastIndex),
+              onClose = { overlay = StatusOverlay.None },
+              onStatusViewed = viewModel::markViewed
+            )
+          }
         }
       }
     }
@@ -155,18 +174,19 @@ private fun StatusListScreen(
       }
 
       if (uiState.recentContacts.isEmpty()) {
-        item {
+        item(key = "empty-recent") {
           Text(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             text = stringResource(id = R.string.status_no_recent),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onTertiary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
           )
         }
       } else {
         items(
           items = uiState.recentContacts,
-          key = { it.userId }
+          key = { it.userId },
+          contentType = { "contact-status" }
         ) { status ->
           ContactStatusRow(
             status = status,
@@ -181,33 +201,21 @@ private fun StatusListScreen(
         .align(Alignment.BottomEnd)
         .padding(16.dp)
     ) {
-      FloatingActionButton(
-        modifier = Modifier
-          .padding(bottom = 12.dp)
-          .size(48.dp),
+      BatchItFab(
+        modifier = Modifier.padding(bottom = 12.dp),
+        onClick = onFabClick,
+        icon = Icons.Default.Edit,
+        contentDescription = stringResource(id = R.string.status_compose_text),
+        size = 48.dp,
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = CircleShape,
-        onClick = onFabClick
-      ) {
-        Icon(
-          imageVector = Icons.Default.Edit,
-          contentDescription = stringResource(id = R.string.status_compose_text),
-          tint = GREEN500
-        )
-      }
+        contentColor = MaterialTheme.colorScheme.secondary
+      )
 
-      FloatingActionButton(
-        modifier = Modifier.size(58.dp),
-        containerColor = GREEN500,
-        shape = CircleShape,
-        onClick = onFabClick
-      ) {
-        Icon(
-          imageVector = WhatsAppIcons.Camera,
-          contentDescription = stringResource(id = R.string.status_add),
-          tint = Color.White
-        )
-      }
+      BatchItFab(
+        onClick = onFabClick,
+        icon = WhatsAppIcons.Camera,
+        contentDescription = stringResource(id = R.string.status_add)
+      )
     }
   }
 }
@@ -218,9 +226,8 @@ private fun MyStatusRow(
   onClick: () -> Unit
 ) {
   val hasStatus = myStatuses.isNotEmpty()
-  val imageUrl = myStatuses.firstOrNull()?.userImage
-    ?.takeIf { it.isNotBlank() }
-    ?: "https://i.pravatar.cc/150?u=me"
+  val imageUrl = myStatuses.firstOrNull()?.userImage?.takeIf { it.isNotBlank() }
+  val timeFormatter = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
 
   Row(
     modifier = Modifier
@@ -230,21 +237,15 @@ private fun MyStatusRow(
     verticalAlignment = Alignment.CenterVertically
   ) {
     Box {
-      GlideImage(
-        modifier = Modifier
-          .size(56.dp)
-          .clip(CircleShape)
-          .then(
-            if (hasStatus) {
-              Modifier.border(2.dp, GREEN400, CircleShape)
-            } else {
-              Modifier
-            }
-          ),
-        imageModel = { imageUrl },
-        previewPlaceholder = painterResource(
-          id = io.getstream.whatsappclone.designsystem.R.drawable.placeholder
-        )
+      BatchItAvatar(
+        imageUrl = imageUrl
+          ?: io.getstream.whatsappclone.designsystem.R.drawable.placeholder,
+        size = 56.dp,
+        modifier = if (hasStatus) {
+          Modifier.border(2.dp, GREEN400, CircleShape)
+        } else {
+          Modifier
+        }
       )
       if (!hasStatus) {
         Box(
@@ -252,12 +253,12 @@ private fun MyStatusRow(
             .align(Alignment.BottomEnd)
             .size(20.dp)
             .clip(CircleShape)
-            .background(GREEN500),
+            .background(MaterialTheme.colorScheme.secondary),
           contentAlignment = Alignment.Center
         ) {
           Text(
             text = "+",
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onSecondary,
             style = MaterialTheme.typography.labelSmall
           )
         }
@@ -273,12 +274,12 @@ private fun MyStatusRow(
       Spacer(modifier = Modifier.size(4.dp))
       Text(
         text = if (hasStatus) {
-          formatStatusTime(myStatuses.maxOf { it.createdAt })
+          timeFormatter.format(Date(myStatuses.maxOf { it.createdAt }))
         } else {
           stringResource(id = R.string.status_desc)
         },
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onTertiary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
       )
     }
   }
@@ -289,6 +290,11 @@ private fun ContactStatusRow(
   status: StatusItem,
   onClick: () -> Unit
 ) {
+  val timeFormatter = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
+  val imageUrl = status.userImage.ifBlank {
+    io.getstream.whatsappclone.designsystem.R.drawable.placeholder
+  }
+
   Row(
     modifier = Modifier
       .fillMaxWidth()
@@ -296,17 +302,10 @@ private fun ContactStatusRow(
       .padding(horizontal = 12.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically
   ) {
-    GlideImage(
-      modifier = Modifier
-        .size(56.dp)
-        .clip(CircleShape)
-        .border(2.dp, GREEN400, CircleShape),
-      imageModel = {
-        status.userImage.ifBlank { "https://i.pravatar.cc/150?u=${status.userId}" }
-      },
-      previewPlaceholder = painterResource(
-        id = io.getstream.whatsappclone.designsystem.R.drawable.placeholder
-      )
+    BatchItAvatar(
+      imageUrl = imageUrl,
+      size = 56.dp,
+      modifier = Modifier.border(2.dp, GREEN400, CircleShape)
     )
 
     Column(modifier = Modifier.padding(start = 12.dp)) {
@@ -317,16 +316,13 @@ private fun ContactStatusRow(
       )
       Spacer(modifier = Modifier.size(4.dp))
       Text(
-        text = formatStatusTime(status.createdAt),
+        text = timeFormatter.format(Date(status.createdAt)),
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onTertiary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
       )
     }
   }
 }
-
-private fun formatStatusTime(millis: Long): String =
-  DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(millis))
 
 @Preview
 @Composable

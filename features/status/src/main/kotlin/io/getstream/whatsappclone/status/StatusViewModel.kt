@@ -32,17 +32,11 @@ import kotlinx.coroutines.launch
 data class StatusUiState(
   val myStatuses: List<StatusItem> = emptyList(),
   val contactStatuses: List<StatusItem> = emptyList(),
+  val recentContacts: List<StatusItem> = emptyList(),
   val isLoading: Boolean = true,
   val isSaving: Boolean = false,
   val errorMessage: String? = null
-) {
-  /** Latest status per contact for the list row. */
-  val recentContacts: List<StatusItem>
-    get() = contactStatuses
-      .groupBy { it.userId }
-      .mapNotNull { (_, items) -> items.maxByOrNull { it.createdAt } }
-      .sortedByDescending { it.createdAt }
-}
+)
 
 @HiltViewModel
 class StatusViewModel @Inject constructor(
@@ -52,6 +46,7 @@ class StatusViewModel @Inject constructor(
   private val _isSaving = MutableStateFlow(false)
   private val _errorMessage = MutableStateFlow<String?>(null)
   private val _isLoading = MutableStateFlow(true)
+  private var hasLoadedOnce = false
 
   val uiState: StateFlow<StatusUiState> = combine(
     statusRepository.myStatuses,
@@ -63,6 +58,10 @@ class StatusViewModel @Inject constructor(
     StatusUiState(
       myStatuses = mine,
       contactStatuses = contacts,
+      recentContacts = contacts
+        .groupBy { it.userId }
+        .mapNotNull { (_, items) -> items.maxByOrNull { it.createdAt } }
+        .sortedByDescending { it.createdAt },
       isLoading = loading,
       isSaving = saving,
       errorMessage = error
@@ -73,14 +72,18 @@ class StatusViewModel @Inject constructor(
     initialValue = StatusUiState()
   )
 
-  init {
-    refresh()
+  /** Call when the Status tab becomes the settled page. */
+  fun onTabActive() {
+    if (!hasLoadedOnce || uiState.value.myStatuses.isEmpty() && uiState.value.contactStatuses.isEmpty()) {
+      refresh()
+    }
   }
 
   fun refresh() {
     viewModelScope.launch {
-      _isLoading.value = true
+      _isLoading.value = !hasLoadedOnce
       statusRepository.refresh()
+      hasLoadedOnce = true
       _isLoading.value = false
     }
   }

@@ -16,8 +16,8 @@
 
 package io.getstream.whatsappclone.chats.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import io.getstream.chat.android.compose.ui.theme.ChatTheme
 import io.getstream.chat.android.compose.ui.theme.StreamColors
 import io.getstream.whatsappclone.chats.reactions.WhatsAppCloneReactionFactory
@@ -25,28 +25,39 @@ import io.getstream.whatsappclone.designsystem.theme.DARK_GREEN300
 import io.getstream.whatsappclone.designsystem.theme.GREEN200
 import io.getstream.whatsappclone.designsystem.theme.GREEN450
 import io.getstream.whatsappclone.designsystem.theme.GREEN600
+import io.getstream.whatsappclone.designsystem.theme.LIGHT_CHAT_BACKGROUND
+import io.getstream.whatsappclone.designsystem.theme.LocalDarkTheme
 
 @Composable
 fun WhatsAppChatTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
+  darkTheme: Boolean = LocalDarkTheme.current,
   content: @Composable () -> Unit
 ) {
-  val streamColors = if (darkTheme) {
-    StreamColors.defaultDarkColors().copy(
-      appBackground = DARK_GREEN300,
-      primaryAccent = GREEN450,
-      ownMessagesBackground = GREEN600
-    )
+  val baseColors = if (darkTheme) {
+    StreamColors.defaultDarkColors()
   } else {
-    StreamColors.defaultColors().copy(
-      primaryAccent = GREEN450,
-      ownMessagesBackground = GREEN200
-    )
+    StreamColors.defaultColors()
   }
+  val streamColors = remember(darkTheme, baseColors) {
+    if (darkTheme) {
+      baseColors.copy(
+        appBackground = DARK_GREEN300,
+        primaryAccent = GREEN450,
+        ownMessagesBackground = GREEN600
+      )
+    } else {
+      baseColors.copy(
+        appBackground = LIGHT_CHAT_BACKGROUND,
+        primaryAccent = GREEN450,
+        ownMessagesBackground = GREEN200
+      )
+    }
+  }
+  val reactionFactory = remember { WhatsAppCloneReactionFactory() }
 
   ChatTheme(
     colors = streamColors,
-    reactionIconFactory = WhatsAppCloneReactionFactory(),
+    reactionIconFactory = reactionFactory,
     content = content
   )
 }

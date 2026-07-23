@@ -82,6 +82,9 @@ sealed class WhatsAppScreens(
 
   // privacy settings
   data object PrivacySettings : WhatsAppScreens("privacy_settings")
+
+  // friends + contacts invite
+  data object FriendsContacts : WhatsAppScreens("friends_contacts")
 }
 
 private fun String.appendArguments(navArguments: List<NamedNavArgument>): String {

@@ -21,6 +21,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.chat.android.client.ChatClient
+import io.getstream.chat.android.client.api.models.QueryChannelRequest
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
 import io.getstream.whatsappclone.uistate.WhatsAppMessageUiState
@@ -43,7 +44,7 @@ class WhatsAppMessagesViewModel @Inject constructor(
 
   init {
     if (channelId != null) {
-      fetchChannel(channelId = channelId)
+      fetchChannelHeader(channelId = channelId)
     }
   }
 
@@ -62,9 +63,13 @@ class WhatsAppMessagesViewModel @Inject constructor(
     )
   }
 
-  private fun fetchChannel(channelId: String) {
+  /**
+   * Lightweight header fetch — do not call channel.watch() (MessagesScreen owns that).
+   */
+  private fun fetchChannelHeader(channelId: String) {
     viewModelScope.launch {
-      val result = chatClient.channel(channelId).watch().await()
+      val request = QueryChannelRequest().withMessages(0)
+      val result = chatClient.channel(channelId).query(request).await()
       result.onSuccess {
         messageMutableUiState.value = WhatsAppMessageUiState.Success(result.getOrThrow())
       }.onError {

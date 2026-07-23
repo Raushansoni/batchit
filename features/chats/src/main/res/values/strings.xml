@@ -18,10 +18,24 @@
   <string name="stream_top_bar">BatchIt</string>
   <string name="new_chat">New chat</string>
   <string name="new_group">New group</string>
-  <string name="contact_user_id">Contact user ID</string>
+  <string name="contact_user_id">Username</string>
   <string name="start_chat">Start chat</string>
   <string name="cancel">Cancel</string>
   <string name="group_name">Group name</string>
-  <string name="member_ids_hint">Member IDs (comma-separated)</string>
+  <string name="member_usernames_hint">Usernames (comma-separated)</string>
   <string name="create_group">Create group</string>
+
+  <string name="friends_title">New chat</string>
+  <string name="friends_subtitle">Add friends by username or invite your contacts</string>
+  <string name="friends_your_username">Your username: @%1$s</string>
+  <string name="friends_username_hint">Friend\'s username</string>
+  <string name="friends_add_and_chat">Add friend &amp; chat</string>
+  <string name="friends_section_friends">Friends on BatchIt</string>
+  <string name="friends_section_contacts">Phone contacts</string>
+  <string name="friends_chat">Chat</string>
+  <string name="friends_invite">Invite</string>
+  <string name="friends_on_batchit">On BatchIt · @%1$s</string>
+  <string name="friends_contacts_permission">Allow contacts access to find friends already on BatchIt and invite others.</string>
+  <string name="friends_allow_contacts">Allow contacts</string>
+  <string name="friends_no_contacts">No contacts found on this phone.</string>
 </resources>

@@ -16,14 +16,19 @@
 
 package io.getstream.whatsappclone.chats.initializer
 
+import android.app.Application
 import android.content.Context
 import androidx.startup.Initializer
+import io.getstream.log.android.AndroidStreamLogger
 import io.getstream.log.streamLog
 import io.getstream.whatsappclone.chats.BuildConfig
 
 class StreamLogInitializer : Initializer<Unit> {
 
   override fun create(context: Context) {
+    val app = context.applicationContext as Application
+    AndroidStreamLogger.installOnDebuggableApp(app)
+
     if (BuildConfig.DEBUG) {
       streamLog { "StreamLogInitializer is initialized" }
     }

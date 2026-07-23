@@ -25,6 +25,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import io.getstream.whatsappclone.auth.AuthViewModel
 import io.getstream.whatsappclone.calls.info.WhatsAppCallHistoryInfo
+import io.getstream.whatsappclone.chats.friends.FriendsContactsScreen
 import io.getstream.whatsappclone.chats.messages.WhatsAppMessages
 import io.getstream.whatsappclone.model.WhatsAppUser
 import io.getstream.whatsappclone.settings.ui.BatchItSettingsScreen
@@ -43,6 +44,9 @@ fun NavGraphBuilder.whatsAppHomeNavigation(
         WhatsAppTopBar(
           onSettingsClick = {
             composeNavigator.navigate(WhatsAppScreens.Settings.name)
+          },
+          onSearchClick = {
+            composeNavigator.navigate(WhatsAppScreens.FriendsContacts.name)
           }
         )
       }
@@ -112,5 +116,9 @@ fun NavGraphBuilder.whatsAppHomeNavigation(
     PrivacySettingsScreen(
       onBackClick = { composeNavigator.navigateUp() }
     )
+  }
+
+  composable(route = WhatsAppScreens.FriendsContacts.name) {
+    FriendsContactsScreen()
   }
 }

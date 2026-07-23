@@ -16,122 +16,105 @@
 
 package io.getstream.whatsappclone.chats.messages
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.TopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.skydoves.landscapist.animation.crossfade.CrossfadePlugin
-import com.skydoves.landscapist.components.rememberImageComponent
-import com.skydoves.landscapist.glide.GlideImage
+import io.getstream.whatsappclone.designsystem.component.BatchItAvatar
 import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
+import io.getstream.whatsappclone.designsystem.theme.getChromeContentColor
 import io.getstream.whatsappclone.uistate.WhatsAppMessageUiState
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WhatsAppMessageTopBar(
   messageUiState: WhatsAppMessageUiState,
   navigateToVideoCall: (Boolean) -> Unit,
   onBackClick: () -> Unit
 ) {
+  val chrome = getChromeContentColor()
+
   TopAppBar(
     modifier = Modifier.fillMaxWidth(),
     navigationIcon = {
-      Icon(
-        modifier = Modifier
-          .size(26.dp)
-          .clickable {
-            onBackClick()
-          },
-        imageVector = WhatsAppIcons.ArrowBack,
-        tint = MaterialTheme.colorScheme.tertiary,
-        contentDescription = null
-      )
+      IconButton(onClick = onBackClick) {
+        Icon(
+          modifier = Modifier.size(24.dp),
+          imageVector = WhatsAppIcons.ArrowBack,
+          tint = chrome,
+          contentDescription = null
+        )
+      }
     },
     title = {
-      WhatsAppMessageUserInfo(messageUiState = messageUiState)
+      WhatsAppMessageUserInfo(
+        messageUiState = messageUiState,
+        contentColor = chrome
+      )
     },
     actions = {
-      Icon(
-        modifier = Modifier
-          .size(26.dp)
-          .clickable {
-            navigateToVideoCall(true)
-          },
-        imageVector = WhatsAppIcons.Video,
-        tint = MaterialTheme.colorScheme.tertiary,
-        contentDescription = null
-      )
-
-      Spacer(modifier = Modifier.size(16.dp))
-
-      Icon(
-        modifier = Modifier
-          .size(26.dp)
-          .clickable {
-            navigateToVideoCall(false)
-          },
-        imageVector = WhatsAppIcons.Call,
-        tint = MaterialTheme.colorScheme.tertiary,
-        contentDescription = null
-      )
-
-      Spacer(modifier = Modifier.size(16.dp))
-
-      Icon(
-        modifier = Modifier.size(26.dp),
-        imageVector = WhatsAppIcons.MoreVert,
-        tint = MaterialTheme.colorScheme.tertiary,
-        contentDescription = null
-      )
+      IconButton(onClick = { navigateToVideoCall(true) }) {
+        Icon(
+          modifier = Modifier.size(24.dp),
+          imageVector = WhatsAppIcons.Video,
+          tint = chrome,
+          contentDescription = null
+        )
+      }
+      IconButton(onClick = { navigateToVideoCall(false) }) {
+        Icon(
+          modifier = Modifier.size(24.dp),
+          imageVector = WhatsAppIcons.Call,
+          tint = chrome,
+          contentDescription = null
+        )
+      }
     },
-    backgroundColor = MaterialTheme.colorScheme.primary
+    colors = TopAppBarDefaults.topAppBarColors(
+      containerColor = MaterialTheme.colorScheme.primary,
+      titleContentColor = chrome,
+      navigationIconContentColor = chrome,
+      actionIconContentColor = chrome
+    )
   )
 }
 
 @Composable
 private fun WhatsAppMessageUserInfo(
-  messageUiState: WhatsAppMessageUiState
+  messageUiState: WhatsAppMessageUiState,
+  contentColor: androidx.compose.ui.graphics.Color
 ) {
   when (messageUiState) {
     WhatsAppMessageUiState.Loading -> WhatsAppLoadingIndicator()
     WhatsAppMessageUiState.Error -> Unit
     is WhatsAppMessageUiState.Success -> {
-      Row {
-        GlideImage(
-          modifier = Modifier
-            .size(32.dp)
-            .clip(CircleShape),
-          imageModel = {
-            messageUiState.data.image.takeIf { it.isNotEmpty() }
-              ?: io.getstream.whatsappclone.designsystem.R.drawable.stream_logo
-          },
-          component = rememberImageComponent {
-            +CrossfadePlugin()
-          },
-          previewPlaceholder = painterResource(
-            id = io.getstream.whatsappclone.designsystem.R.drawable.placeholder
-          )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        BatchItAvatar(
+          imageUrl = messageUiState.data.image.takeIf { it.isNotEmpty() }
+            ?: io.getstream.whatsappclone.designsystem.R.drawable.stream_logo,
+          size = 34.dp
         )
 
         Text(
           modifier = Modifier.padding(start = 12.dp),
           text = messageUiState.data.name,
-          color = MaterialTheme.colorScheme.tertiary,
-          style = MaterialTheme.typography.bodyLarge
+          color = contentColor,
+          style = MaterialTheme.typography.titleMedium,
+          maxLines = 1
         )
       }
     }

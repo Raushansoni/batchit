@@ -16,7 +16,10 @@
 
 package io.getstream.whatsappclone.auth
 
+/**
+ * Free production auth: Google Sign-In + Cloudflare Worker Stream tokens.
+ * Set [USE_DEMO_AUTH] true only for local testing without the Worker.
+ */
 object BatchItAuthConfig {
-  /** Set false for Play Store production with Firebase Phone Auth + Cloud Functions. */
-  const val USE_DEMO_AUTH = true
+  const val USE_DEMO_AUTH = false
 }

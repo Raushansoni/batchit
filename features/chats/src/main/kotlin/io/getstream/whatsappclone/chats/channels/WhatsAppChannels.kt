@@ -23,11 +23,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,122 +35,94 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.compose.ui.channels.ChannelsScreen
+import io.getstream.chat.android.models.Channel
 import io.getstream.whatsappclone.chats.R
 import io.getstream.whatsappclone.chats.theme.WhatsAppChatTheme
+import io.getstream.whatsappclone.designsystem.component.BatchItFab
+import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
-import io.getstream.whatsappclone.designsystem.theme.GREEN500
 
 @Composable
 fun WhatsAppChannels(
   whatsChannelsViewModel: WhatsChannelsViewModel = hiltViewModel()
 ) {
-  var showNewChatDialog by remember { mutableStateOf(false) }
   var showGroupDialog by remember { mutableStateOf(false) }
+  val currentUser by ChatClient.instance().clientState.user.collectAsStateWithLifecycle()
+  val error by whatsChannelsViewModel.error.collectAsStateWithLifecycle()
+
+  val onChannelClick = remember<(Channel) -> Unit>(whatsChannelsViewModel) {
+    { channel -> whatsChannelsViewModel.navigateToMessages(channel.cid) }
+  }
+  val onOpenFriends = remember(whatsChannelsViewModel) {
+    { whatsChannelsViewModel.openFriendsContacts() }
+  }
 
   WhatsAppChatTheme {
     Box(modifier = Modifier.fillMaxSize()) {
-      ChannelsScreen(
-        isShowingHeader = false,
-        onChannelClick = { channel ->
-          whatsChannelsViewModel.navigateToMessages(channel.cid)
+      if (currentUser == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+          WhatsAppLoadingIndicator()
         }
-      )
+      } else {
+        ChannelsScreen(
+          isShowingHeader = false,
+          onChannelClick = onChannelClick
+        )
+      }
 
       Column(
         modifier = Modifier
           .align(Alignment.BottomEnd)
           .padding(16.dp)
       ) {
-        FloatingActionButton(
-          modifier = Modifier.size(48.dp),
-          containerColor = GREEN500,
-          shape = CircleShape,
-          onClick = { showGroupDialog = true }
-        ) {
-          Icon(
-            imageVector = WhatsAppIcons.Groups,
-            contentDescription = stringResource(id = R.string.new_group),
-            tint = Color.White
-          )
-        }
+        BatchItFab(
+          onClick = { showGroupDialog = true },
+          icon = WhatsAppIcons.Groups,
+          contentDescription = stringResource(id = R.string.new_group),
+          size = 48.dp,
+          containerColor = MaterialTheme.colorScheme.surfaceVariant,
+          contentColor = MaterialTheme.colorScheme.secondary
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        FloatingActionButton(
-          modifier = Modifier.size(58.dp),
-          containerColor = GREEN500,
-          shape = CircleShape,
-          onClick = { showNewChatDialog = true }
-        ) {
-          Icon(
-            imageVector = WhatsAppIcons.Message,
-            contentDescription = stringResource(id = R.string.new_chat),
-            tint = Color.White
-          )
-        }
+        BatchItFab(
+          onClick = onOpenFriends,
+          icon = WhatsAppIcons.Message,
+          contentDescription = stringResource(id = R.string.new_chat)
+        )
       }
     }
-  }
-
-  if (showNewChatDialog) {
-    NewChatDialog(
-      onDismiss = { showNewChatDialog = false },
-      onCreate = { userId ->
-        showNewChatDialog = false
-        whatsChannelsViewModel.createDirectChannel(userId)
-      }
-    )
   }
 
   if (showGroupDialog) {
     NewGroupDialog(
       onDismiss = { showGroupDialog = false },
-      onCreate = { name, memberIds ->
+      onCreate = { name, memberUsernames ->
         showGroupDialog = false
-        whatsChannelsViewModel.createGroupChannel(name, memberIds)
+        whatsChannelsViewModel.createGroupChannel(name, memberUsernames)
       }
     )
   }
-}
 
-@Composable
-private fun NewChatDialog(
-  onDismiss: () -> Unit,
-  onCreate: (String) -> Unit
-) {
-  var userId by remember { mutableStateOf("") }
-
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = { Text(text = stringResource(id = R.string.new_chat)) },
-    text = {
-      OutlinedTextField(
-        modifier = Modifier.fillMaxWidth(),
-        value = userId,
-        onValueChange = { userId = it },
-        label = { Text(text = stringResource(id = R.string.contact_user_id)) },
-        singleLine = true
-      )
-    },
-    confirmButton = {
-      TextButton(
-        onClick = { if (userId.isNotBlank()) onCreate(userId.trim()) },
-        enabled = userId.isNotBlank()
-      ) {
-        Text(text = stringResource(id = R.string.start_chat))
+  error?.let { message ->
+    AlertDialog(
+      onDismissRequest = whatsChannelsViewModel::clearError,
+      title = { Text(text = stringResource(id = R.string.new_chat)) },
+      text = { Text(text = message) },
+      confirmButton = {
+        TextButton(onClick = whatsChannelsViewModel::clearError) {
+          Text(text = stringResource(id = R.string.cancel))
+        }
       }
-    },
-    dismissButton = {
-      TextButton(onClick = onDismiss) {
-        Text(text = stringResource(id = R.string.cancel))
-      }
-    }
-  )
+    )
+  }
 }
 
 @Composable
@@ -162,7 +131,7 @@ private fun NewGroupDialog(
   onCreate: (String, List<String>) -> Unit
 ) {
   var groupName by remember { mutableStateOf("") }
-  var memberIds by remember { mutableStateOf("") }
+  var memberUsernames by remember { mutableStateOf("") }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -179,9 +148,9 @@ private fun NewGroupDialog(
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
           modifier = Modifier.fillMaxWidth(),
-          value = memberIds,
-          onValueChange = { memberIds = it },
-          label = { Text(text = stringResource(id = R.string.member_ids_hint)) },
+          value = memberUsernames,
+          onValueChange = { memberUsernames = it },
+          label = { Text(text = stringResource(id = R.string.member_usernames_hint)) },
           singleLine = true
         )
       }
@@ -190,8 +159,8 @@ private fun NewGroupDialog(
       TextButton(
         onClick = {
           if (groupName.isNotBlank()) {
-            val members = memberIds.split(",")
-              .map { it.trim() }
+            val members = memberUsernames.split(",")
+              .map { it.trim().removePrefix("@") }
               .filter { it.isNotEmpty() }
             onCreate(groupName.trim(), members)
           }

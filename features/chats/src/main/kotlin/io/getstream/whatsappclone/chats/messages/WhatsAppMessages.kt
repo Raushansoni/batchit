@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -34,25 +35,33 @@ fun WhatsAppMessages(
   whatsAppMessagesViewModel: WhatsAppMessagesViewModel = hiltViewModel()
 ) {
   val messageUiState by whatsAppMessagesViewModel.messageUiSate.collectAsStateWithLifecycle()
+  val context = LocalContext.current
+  val factory = remember(channelId, context) {
+    MessagesViewModelFactory(
+      context = context,
+      channelId = channelId,
+      messageLimit = 25
+    )
+  }
+  val onBack = remember(whatsAppMessagesViewModel) {
+    { whatsAppMessagesViewModel.handleEvents(WhatsAppMessageEvent.NavigateUp) }
+  }
+  val onVideoCall = remember(whatsAppMessagesViewModel, channelId) {
+    { video: Boolean -> whatsAppMessagesViewModel.navigateToVideoCall(channelId, video) }
+  }
 
   WhatsAppChatTheme {
     Column(Modifier.fillMaxSize()) {
       WhatsAppMessageTopBar(
         messageUiState = messageUiState,
-        navigateToVideoCall = {
-          whatsAppMessagesViewModel.navigateToVideoCall(channelId, videoCall = it)
-        },
-        onBackClick = { whatsAppMessagesViewModel.handleEvents(WhatsAppMessageEvent.NavigateUp) }
+        navigateToVideoCall = onVideoCall,
+        onBackClick = onBack
       )
 
       MessagesScreen(
-        viewModelFactory = MessagesViewModelFactory(
-          context = LocalContext.current,
-          channelId = channelId,
-          messageLimit = 30
-        ),
+        viewModelFactory = factory,
         showHeader = false,
-        onBackPressed = { whatsAppMessagesViewModel.handleEvents(WhatsAppMessageEvent.NavigateUp) }
+        onBackPressed = onBack
       )
     }
   }

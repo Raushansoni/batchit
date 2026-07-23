@@ -19,6 +19,10 @@
   <string name="settings_default_name">BatchIt User</string>
   <string name="settings_default_about">Hey there! I am using BatchIt.</string>
   <string name="settings_account">Account</string>
+  <string name="settings_appearance">Appearance</string>
+  <string name="settings_theme_system">System default</string>
+  <string name="settings_theme_light">Light</string>
+  <string name="settings_theme_dark">Dark</string>
   <string name="settings_privacy">Privacy</string>
   <string name="settings_notifications">Notifications</string>
   <string name="settings_storage">Storage and data</string>

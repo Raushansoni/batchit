@@ -19,6 +19,7 @@ package io.getstream.whatsappclone.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.getstream.whatsappclone.designsystem.theme.ThemeMode
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +44,13 @@ class SettingsViewModel @Inject constructor(
       initialValue = UserProfile()
     )
 
+  val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
+    .stateIn(
+      scope = viewModelScope,
+      started = SharingStarted.WhileSubscribed(5_000),
+      initialValue = ThemeMode.SYSTEM
+    )
+
   fun setLastSeenVisible(visible: Boolean) {
     settingsRepository.setLastSeenVisible(visible)
   }
@@ -53,5 +61,9 @@ class SettingsViewModel @Inject constructor(
 
   fun setProfilePhotoVisible(visible: Boolean) {
     settingsRepository.setProfilePhotoVisible(visible)
+  }
+
+  fun setThemeMode(mode: ThemeMode) {
+    settingsRepository.setThemeMode(mode)
   }
 }

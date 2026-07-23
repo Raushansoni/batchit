@@ -19,6 +19,7 @@ package io.getstream.whatsappclone.settings
 import android.content.Context
 import android.content.SharedPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.getstream.whatsappclone.designsystem.theme.ThemeMode
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -52,6 +53,9 @@ class SettingsRepository @Inject constructor(
   private val _userProfile = MutableStateFlow(readUserProfile())
   val userProfile: Flow<UserProfile> = _userProfile.asStateFlow()
 
+  private val _themeMode = MutableStateFlow(readThemeMode())
+  val themeMode: Flow<ThemeMode> = _themeMode.asStateFlow()
+
   fun setLastSeenVisible(visible: Boolean) {
     prefs.edit().putBoolean(KEY_LAST_SEEN, visible).apply()
     _privacySettings.update { it.copy(lastSeenVisible = visible) }
@@ -65,6 +69,11 @@ class SettingsRepository @Inject constructor(
   fun setProfilePhotoVisible(visible: Boolean) {
     prefs.edit().putBoolean(KEY_PROFILE_PHOTO, visible).apply()
     _privacySettings.update { it.copy(profilePhotoVisible = visible) }
+  }
+
+  fun setThemeMode(mode: ThemeMode) {
+    prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
+    _themeMode.value = mode
   }
 
   fun updateProfile(name: String, about: String, imageUrl: String = _userProfile.value.imageUrl) {
@@ -88,11 +97,15 @@ class SettingsRepository @Inject constructor(
     imageUrl = prefs.getString(KEY_IMAGE, null) ?: "https://placekitten.com/200/300"
   )
 
+  private fun readThemeMode(): ThemeMode =
+    ThemeMode.fromStorage(prefs.getString(KEY_THEME_MODE, null))
+
   companion object {
     private const val PREFS_NAME = "batchit_settings"
     private const val KEY_LAST_SEEN = "privacy_last_seen"
     private const val KEY_READ_RECEIPTS = "privacy_read_receipts"
     private const val KEY_PROFILE_PHOTO = "privacy_profile_photo"
+    private const val KEY_THEME_MODE = "theme_mode"
     private const val KEY_NAME = "profile_name"
     private const val KEY_ABOUT = "profile_about"
     private const val KEY_IMAGE = "profile_image"

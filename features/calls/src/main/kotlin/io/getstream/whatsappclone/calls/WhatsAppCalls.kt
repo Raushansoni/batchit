@@ -22,24 +22,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.getstream.whatsappclone.designsystem.component.BatchItFab
 import io.getstream.whatsappclone.designsystem.component.WhatsAppError
 import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingColumn
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
-import io.getstream.whatsappclone.designsystem.theme.GREEN500
 import io.getstream.whatsappclone.model.WhatsAppUser
 import io.getstream.whatsappclone.uistate.WhatsAppUserUiState
 import java.util.UUID
@@ -49,11 +46,30 @@ fun WhatsAppCalls(
   whatsAppCallsViewModel: WhatsAppCallsViewModel = hiltViewModel()
 ) {
   val whatsAppUsersUiState by whatsAppCallsViewModel.whatsAppUserState.collectAsStateWithLifecycle()
+  val onHistoryItemClick = remember(whatsAppCallsViewModel) {
+    { user: WhatsAppUser -> whatsAppCallsViewModel.navigateToCallInfo(user) }
+  }
+  val onVideoCall = remember(whatsAppCallsViewModel) {
+    {
+      whatsAppCallsViewModel.startCall(
+        callId = UUID.randomUUID().toString(),
+        videoCall = true
+      )
+    }
+  }
+  val onAudioCall = remember(whatsAppCallsViewModel) {
+    {
+      whatsAppCallsViewModel.startCall(
+        callId = UUID.randomUUID().toString(),
+        videoCall = false
+      )
+    }
+  }
 
   Box(modifier = Modifier.fillMaxSize()) {
     WhatsAppCallsScreen(
       whatsAppUsersUiState = whatsAppUsersUiState,
-      onHistoryItemClick = whatsAppCallsViewModel::navigateToCallInfo
+      onHistoryItemClick = onHistoryItemClick
     )
 
     Column(
@@ -61,43 +77,22 @@ fun WhatsAppCalls(
         .align(Alignment.BottomEnd)
         .padding(16.dp)
     ) {
-      FloatingActionButton(
-        modifier = Modifier.size(48.dp),
-        containerColor = GREEN500,
-        shape = CircleShape,
-        onClick = {
-          whatsAppCallsViewModel.startCall(
-            callId = UUID.randomUUID().toString(),
-            videoCall = true
-          )
-        }
-      ) {
-        Icon(
-          imageVector = WhatsAppIcons.Video,
-          contentDescription = null,
-          tint = Color.White
-        )
-      }
+      BatchItFab(
+        onClick = onVideoCall,
+        icon = WhatsAppIcons.Video,
+        contentDescription = null,
+        size = 48.dp,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.secondary
+      )
 
       Spacer(modifier = Modifier.height(12.dp))
 
-      FloatingActionButton(
-        modifier = Modifier.size(58.dp),
-        containerColor = GREEN500,
-        shape = CircleShape,
-        onClick = {
-          whatsAppCallsViewModel.startCall(
-            callId = UUID.randomUUID().toString(),
-            videoCall = false
-          )
-        }
-      ) {
-        Icon(
-          imageVector = WhatsAppIcons.Call,
-          contentDescription = null,
-          tint = Color.White
-        )
-      }
+      BatchItFab(
+        onClick = onAudioCall,
+        icon = WhatsAppIcons.Call,
+        contentDescription = null
+      )
     }
   }
 }
@@ -114,10 +109,11 @@ private fun WhatsAppCallsScreen(
       LazyColumn {
         items(
           items = whatsAppUsersUiState.data.whatsappUserList,
-          key = { it.name }
-        ) {
-          WhatsAppCallHistory(whatsAppUser = it) {
-            onHistoryItemClick(it)
+          key = { it.name },
+          contentType = { "call-history" }
+        ) { user ->
+          WhatsAppCallHistory(whatsAppUser = user) {
+            onHistoryItemClick(user)
           }
         }
       }

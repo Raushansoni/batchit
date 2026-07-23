@@ -1,0 +1,10 @@
+name = "batchit-stream-token"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Set secrets (never commit real values):
+#   npx wrangler secret put STREAM_API_KEY
+#   npx wrangler secret put STREAM_API_SECRET
+#   npx wrangler secret put FIREBASE_PROJECT_ID
+#
+# Optional local override file: .dev.vars
