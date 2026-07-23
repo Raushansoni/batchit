@@ -27,9 +27,16 @@ import io.getstream.whatsappclone.auth.AuthViewModel
 import io.getstream.whatsappclone.calls.info.WhatsAppCallHistoryInfo
 import io.getstream.whatsappclone.chats.friends.FriendsContactsScreen
 import io.getstream.whatsappclone.chats.messages.WhatsAppMessages
+import io.getstream.whatsappclone.chats.search.ChatSearchScreen
+import io.getstream.whatsappclone.chats.starred.StarredMessagesScreen
 import io.getstream.whatsappclone.model.WhatsAppUser
+import io.getstream.whatsappclone.settings.ui.AccountProfileScreen
 import io.getstream.whatsappclone.settings.ui.BatchItSettingsScreen
+import io.getstream.whatsappclone.settings.ui.BlockedContactsScreen
+import io.getstream.whatsappclone.settings.ui.HelpScreen
+import io.getstream.whatsappclone.settings.ui.NotificationsSettingsScreen
 import io.getstream.whatsappclone.settings.ui.PrivacySettingsScreen
+import io.getstream.whatsappclone.settings.ui.StorageSettingsScreen
 import io.getstream.whatsappclone.ui.WhatsAppTabPager
 import io.getstream.whatsappclone.ui.WhatsAppTopBar
 import io.getstream.whatsappclone.video.WhatsAppVideoCall
@@ -46,7 +53,7 @@ fun NavGraphBuilder.whatsAppHomeNavigation(
             composeNavigator.navigate(WhatsAppScreens.Settings.name)
           },
           onSearchClick = {
-            composeNavigator.navigate(WhatsAppScreens.FriendsContacts.name)
+            composeNavigator.navigate(WhatsAppScreens.ChatSearch.name)
           }
         )
       }
@@ -94,8 +101,23 @@ fun NavGraphBuilder.whatsAppHomeNavigation(
     val authViewModel: AuthViewModel = hiltViewModel()
     val scope = rememberCoroutineScope()
     BatchItSettingsScreen(
+      onAccountClick = {
+        composeNavigator.navigate(WhatsAppScreens.AccountProfile.name)
+      },
       onPrivacyClick = {
         composeNavigator.navigate(WhatsAppScreens.PrivacySettings.name)
+      },
+      onNotificationsClick = {
+        composeNavigator.navigate(WhatsAppScreens.NotificationsSettings.name)
+      },
+      onStorageClick = {
+        composeNavigator.navigate(WhatsAppScreens.StorageSettings.name)
+      },
+      onHelpClick = {
+        composeNavigator.navigate(WhatsAppScreens.Help.name)
+      },
+      onStarredMessagesClick = {
+        composeNavigator.navigate(WhatsAppScreens.StarredMessages.name)
       },
       onSignOutClick = {
         scope.launch {
@@ -105,20 +127,64 @@ fun NavGraphBuilder.whatsAppHomeNavigation(
       },
       onDeleteAccountClick = {
         scope.launch {
-          authViewModel.signOut()
+          authViewModel.deleteAccount()
           composeNavigator.navigateAndClearBackStack(WhatsAppScreens.Home.name)
         }
       }
     )
   }
 
-  composable(route = WhatsAppScreens.PrivacySettings.name) {
-    PrivacySettingsScreen(
+  composable(route = WhatsAppScreens.AccountProfile.name) {
+    AccountProfileScreen(
       onBackClick = { composeNavigator.navigateUp() }
     )
   }
 
-  composable(route = WhatsAppScreens.FriendsContacts.name) {
+  composable(route = WhatsAppScreens.NotificationsSettings.name) {
+    NotificationsSettingsScreen(
+      onBackClick = { composeNavigator.navigateUp() }
+    )
+  }
+
+  composable(route = WhatsAppScreens.StorageSettings.name) {
+    StorageSettingsScreen(
+      onBackClick = { composeNavigator.navigateUp() }
+    )
+  }
+
+  composable(route = WhatsAppScreens.Help.name) {
+    HelpScreen(
+      onBackClick = { composeNavigator.navigateUp() }
+    )
+  }
+
+  composable(route = WhatsAppScreens.PrivacySettings.name) {
+    PrivacySettingsScreen(
+      onBackClick = { composeNavigator.navigateUp() },
+      onBlockedContactsClick = {
+        composeNavigator.navigate(WhatsAppScreens.BlockedContacts.name)
+      }
+    )
+  }
+
+  composable(route = WhatsAppScreens.BlockedContacts.name) {
+    BlockedContactsScreen(
+      onBackClick = { composeNavigator.navigateUp() }
+    )
+  }
+
+  composable(
+    route = WhatsAppScreens.FriendsContacts.name,
+    arguments = WhatsAppScreens.FriendsContacts.navArguments
+  ) {
     FriendsContactsScreen()
+  }
+
+  composable(route = WhatsAppScreens.ChatSearch.name) {
+    ChatSearchScreen()
+  }
+
+  composable(route = WhatsAppScreens.StarredMessages.name) {
+    StarredMessagesScreen()
   }
 }

@@ -24,6 +24,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -35,6 +36,21 @@ class SettingsViewModel @Inject constructor(
       scope = viewModelScope,
       started = SharingStarted.WhileSubscribed(5_000),
       initialValue = PrivacySettings()
+    )
+
+  val notificationSettings: StateFlow<NotificationSettings> =
+    settingsRepository.notificationSettings
+      .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = NotificationSettings()
+      )
+
+  val storageSettings: StateFlow<StorageSettings> = settingsRepository.storageSettings
+    .stateIn(
+      scope = viewModelScope,
+      started = SharingStarted.WhileSubscribed(5_000),
+      initialValue = StorageSettings()
     )
 
   val userProfile: StateFlow<UserProfile> = settingsRepository.userProfile
@@ -51,6 +67,18 @@ class SettingsViewModel @Inject constructor(
       initialValue = ThemeMode.SYSTEM
     )
 
+  val blockedUserIds: StateFlow<Set<String>> = settingsRepository.blockedUserIds
+    .stateIn(
+      scope = viewModelScope,
+      started = SharingStarted.WhileSubscribed(5_000),
+      initialValue = emptySet()
+    )
+
+  init {
+    settingsRepository.syncProfileFromFirebaseAuth()
+    settingsRepository.syncPrivacyFromFirestore()
+  }
+
   fun setLastSeenVisible(visible: Boolean) {
     settingsRepository.setLastSeenVisible(visible)
   }
@@ -63,7 +91,53 @@ class SettingsViewModel @Inject constructor(
     settingsRepository.setProfilePhotoVisible(visible)
   }
 
+  fun setMessageNotifications(enabled: Boolean) {
+    settingsRepository.setMessageNotifications(enabled)
+  }
+
+  fun setCallNotifications(enabled: Boolean) {
+    settingsRepository.setCallNotifications(enabled)
+  }
+
+  fun setNotificationPreview(enabled: Boolean) {
+    settingsRepository.setNotificationPreview(enabled)
+  }
+
+  fun setAutoDownloadWifi(enabled: Boolean) {
+    settingsRepository.setAutoDownloadWifi(enabled)
+  }
+
+  fun setAutoDownloadCellular(enabled: Boolean) {
+    settingsRepository.setAutoDownloadCellular(enabled)
+  }
+
+  fun setMediaQualityHigh(enabled: Boolean) {
+    settingsRepository.setMediaQualityHigh(enabled)
+  }
+
   fun setThemeMode(mode: ThemeMode) {
     settingsRepository.setThemeMode(mode)
+  }
+
+  fun updateProfile(name: String, about: String) {
+    viewModelScope.launch {
+      settingsRepository.updateProfile(name = name.trim(), about = about.trim())
+    }
+  }
+
+  fun blockUser(userId: String) {
+    settingsRepository.blockUser(userId.trim())
+  }
+
+  fun unblockUser(userId: String) {
+    settingsRepository.unblockUser(userId.trim())
+  }
+
+  fun syncProfileFromFirebaseAuth() {
+    settingsRepository.syncProfileFromFirebaseAuth()
+  }
+
+  fun syncPrivacyFromFirestore() {
+    settingsRepository.syncPrivacyFromFirestore()
   }
 }

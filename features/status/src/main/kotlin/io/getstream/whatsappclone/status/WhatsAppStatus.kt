@@ -126,17 +126,30 @@ fun WhatsAppStatus(
               viewModel.createImageStatus(uri, caption) {
                 overlay = StatusOverlay.None
               }
+            },
+            onPostVideo = { uri, caption ->
+              viewModel.createVideoStatus(uri, caption) {
+                overlay = StatusOverlay.None
+              }
             }
           )
         }
         is StatusOverlay.Viewer -> {
           val statuses = viewModel.statusesForUser(current.userId)
+          val viewerInfo by viewModel.viewerInfo.collectAsStateWithLifecycle()
           if (statuses.isNotEmpty()) {
             StatusViewerScreen(
               statuses = statuses,
               initialIndex = current.startIndex.coerceIn(0, statuses.lastIndex),
-              onClose = { overlay = StatusOverlay.None },
-              onStatusViewed = viewModel::markViewed
+              isOwnStatus = viewModel.isOwnStatusUser(current.userId),
+              viewerNames = viewerInfo.viewerNames,
+              isLoadingViewers = viewerInfo.isLoadingViewers,
+              onClose = {
+                viewModel.clearViewerInfo()
+                overlay = StatusOverlay.None
+              },
+              onStatusViewed = viewModel::markViewed,
+              onShowViewers = viewModel::loadViewersForStatus
             )
           }
         }

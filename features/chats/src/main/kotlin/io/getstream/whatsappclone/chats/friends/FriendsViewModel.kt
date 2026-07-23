@@ -16,18 +16,26 @@
 
 package io.getstream.whatsappclone.chats.friends
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.chat.android.client.ChatClient
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+enum class FriendsPickerMode {
+  Chat,
+  CallAudio,
+  CallVideo
+}
 
 data class FriendsUiState(
   val isLoading: Boolean = true,
@@ -36,18 +44,29 @@ data class FriendsUiState(
   val query: String = "",
   val error: String? = null,
   val info: String? = null,
-  val myUsername: String = ""
+  val myUsername: String = "",
+  val mode: FriendsPickerMode = FriendsPickerMode.Chat
 )
 
 @HiltViewModel
 class FriendsViewModel @Inject constructor(
   private val friendsRepository: FriendsRepository,
   private val chatClient: ChatClient,
-  private val composeNavigator: AppComposeNavigator
+  private val composeNavigator: AppComposeNavigator,
+  savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+  private val pickerMode = when (savedStateHandle.get<String>(WhatsAppScreens.FriendsContacts.KEY_MODE)) {
+    WhatsAppScreens.FriendsContacts.MODE_CALL_AUDIO -> FriendsPickerMode.CallAudio
+    WhatsAppScreens.FriendsContacts.MODE_CALL_VIDEO -> FriendsPickerMode.CallVideo
+    else -> FriendsPickerMode.Chat
+  }
+
   private val _uiState = MutableStateFlow(
-    FriendsUiState(myUsername = friendsRepository.myUsername())
+    FriendsUiState(
+      myUsername = friendsRepository.myUsername(),
+      mode = pickerMode
+    )
   )
   val uiState: StateFlow<FriendsUiState> = _uiState.asStateFlow()
 
@@ -92,7 +111,11 @@ class FriendsViewModel @Inject constructor(
                 )
               }
               refresh()
-              startChatWithUser(user)
+              when (pickerMode) {
+                FriendsPickerMode.Chat -> startChatWithUser(user)
+                FriendsPickerMode.CallAudio -> startCallWithUser(user, videoCall = false)
+                FriendsPickerMode.CallVideo -> startCallWithUser(user, videoCall = true)
+              }
             }
             .onFailure { error ->
               _uiState.update {
@@ -132,10 +155,28 @@ class FriendsViewModel @Inject constructor(
     }
   }
 
+  fun startCallWithUser(user: BatchItUser, videoCall: Boolean) {
+    composeNavigator.navigate(
+      WhatsAppScreens.VideoCall.createRoute(
+        callId = UUID.randomUUID().toString(),
+        videoCall = videoCall,
+        members = user.uid
+      )
+    )
+  }
+
+  fun onFriendSelected(user: BatchItUser) {
+    when (pickerMode) {
+      FriendsPickerMode.Chat -> startChatWithUser(user)
+      FriendsPickerMode.CallAudio -> startCallWithUser(user, videoCall = false)
+      FriendsPickerMode.CallVideo -> startCallWithUser(user, videoCall = true)
+    }
+  }
+
   fun addFriendAndChat(user: BatchItUser) {
     viewModelScope.launch {
       friendsRepository.addFriend(user)
-      startChatWithUser(user)
+      onFriendSelected(user)
       refresh()
     }
   }

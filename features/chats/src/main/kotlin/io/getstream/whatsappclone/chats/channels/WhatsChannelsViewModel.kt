@@ -20,6 +20,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.chat.android.client.ChatClient
+import io.getstream.chat.android.models.Channel
 import io.getstream.whatsappclone.chats.friends.FriendsRepository
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
@@ -34,7 +35,8 @@ import kotlinx.coroutines.launch
 class WhatsChannelsViewModel @Inject constructor(
   private val composeNavigator: AppComposeNavigator,
   private val chatClient: ChatClient,
-  private val friendsRepository: FriendsRepository
+  private val friendsRepository: FriendsRepository,
+  private val channelPinStore: ChannelPinStore
 ) : ViewModel() {
 
   private val user = chatClient.clientState.user
@@ -42,12 +44,45 @@ class WhatsChannelsViewModel @Inject constructor(
   private val _error = MutableStateFlow<String?>(null)
   val error: StateFlow<String?> = _error.asStateFlow()
 
+  private val _groupFriends = MutableStateFlow<List<io.getstream.whatsappclone.chats.friends.BatchItUser>>(emptyList())
+  val groupFriends: StateFlow<List<io.getstream.whatsappclone.chats.friends.BatchItUser>> = _groupFriends.asStateFlow()
+
+  private val _isLoadingGroupFriends = MutableStateFlow(false)
+  val isLoadingGroupFriends: StateFlow<Boolean> = _isLoadingGroupFriends.asStateFlow()
+
   fun navigateToMessages(channelId: String) {
     composeNavigator.navigate(WhatsAppScreens.Messages.createRoute(channelId))
   }
 
   fun openFriendsContacts() {
-    composeNavigator.navigate(WhatsAppScreens.FriendsContacts.name)
+    composeNavigator.navigate(WhatsAppScreens.FriendsContacts.createRoute())
+  }
+
+  fun isPinned(channel: Channel): Boolean = channelPinStore.isPinned(channel.cid)
+
+  fun muteChannel(channel: Channel) {
+    viewModelScope.launch {
+      chatClient.channel(channel.cid).mute().await()
+        .onError { _error.value = it.message ?: "Could not mute chat" }
+    }
+  }
+
+  fun unmuteChannel(channel: Channel) {
+    viewModelScope.launch {
+      chatClient.channel(channel.cid).unmute().await()
+        .onError { _error.value = it.message ?: "Could not unmute chat" }
+    }
+  }
+
+  fun archiveChannel(channel: Channel) {
+    viewModelScope.launch {
+      chatClient.channel(channel.cid).hide().await()
+        .onError { _error.value = it.message ?: "Could not archive chat" }
+    }
+  }
+
+  fun togglePin(channel: Channel) {
+    channelPinStore.togglePin(channel.cid)
   }
 
   fun createDirectChannelByUsername(rawUsername: String) {
@@ -106,10 +141,30 @@ class WhatsChannelsViewModel @Inject constructor(
             return@launch
           }
       }
+      createGroupChannelByMemberIds(name, memberIds.distinct())
+    }
+  }
+
+  fun loadGroupFriends() {
+    viewModelScope.launch {
+      _isLoadingGroupFriends.value = true
+      _groupFriends.value = friendsRepository.listFriends().getOrElse { emptyList() }
+      _isLoadingGroupFriends.value = false
+    }
+  }
+
+  fun createGroupChannelByMemberIds(name: String, memberIds: List<String>) {
+    viewModelScope.launch {
+      val me = user.value ?: return@launch
+      val members = (memberIds + me.id).distinct()
+      if (members.size < 2) {
+        _error.value = "Select at least one friend"
+        return@launch
+      }
       val result = chatClient.createChannel(
         channelType = "messaging",
         channelId = "group${Random.nextInt(100000)}",
-        memberIds = memberIds.distinct(),
+        memberIds = members,
         extraData = mapOf("name" to name)
       ).await()
       if (result.isSuccess) {

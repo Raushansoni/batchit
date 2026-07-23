@@ -61,9 +61,25 @@ class WhatsAppCallsViewModel @Inject constructor(
     composeNavigator.navigate(WhatsAppScreens.CallInfo.createRoute(whatsAppUser = whatsAppUser))
   }
 
-  fun startCall(callId: String, videoCall: Boolean) {
+  fun startCall(callId: String, videoCall: Boolean, members: String = "") {
     composeNavigator.navigate(
-      WhatsAppScreens.VideoCall.createRoute(callId = callId, videoCall = videoCall)
+      WhatsAppScreens.VideoCall.createRoute(
+        callId = callId,
+        videoCall = videoCall,
+        members = members
+      )
+    )
+  }
+
+  fun openFriendsForCall(videoCall: Boolean) {
+    composeNavigator.navigate(
+      WhatsAppScreens.FriendsContacts.createRoute(
+        mode = if (videoCall) {
+          WhatsAppScreens.FriendsContacts.MODE_CALL_VIDEO
+        } else {
+          WhatsAppScreens.FriendsContacts.MODE_CALL_AUDIO
+        }
+      )
     )
   }
 }

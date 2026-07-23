@@ -16,6 +16,8 @@
 
 package io.getstream.whatsappclone.status
 
+import android.net.Uri
+import android.widget.VideoView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -33,19 +35,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,6 +68,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.glide.GlideImage
 import io.getstream.whatsappclone.status.model.StatusItem
@@ -65,36 +77,42 @@ import kotlinx.coroutines.delay
 
 private const val AUTO_ADVANCE_MS = 5_000L
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatusViewerScreen(
   statuses: List<StatusItem>,
   initialIndex: Int = 0,
+  isOwnStatus: Boolean = false,
+  viewerNames: Map<String, String> = emptyMap(),
+  isLoadingViewers: Boolean = false,
   onClose: () -> Unit,
-  onStatusViewed: (String) -> Unit
+  onStatusViewed: (String) -> Unit,
+  onShowViewers: (StatusItem) -> Unit = {}
 ) {
   if (statuses.isEmpty()) return
 
   var index by remember {
     mutableIntStateOf(initialIndex.coerceIn(0, statuses.lastIndex.coerceAtLeast(0)))
   }
+  var showViewersSheet by remember { mutableStateOf(false) }
   val current = statuses[index]
+  var videoCompleted by remember(current.id) { mutableStateOf(false) }
 
   LaunchedEffect(current.id) {
     onStatusViewed(current.id)
+    videoCompleted = false
   }
 
-  LaunchedEffect(index, current.id) {
-    val duration = if (current.type == StatusType.TEXT || current.type == StatusType.IMAGE) {
-      AUTO_ADVANCE_MS
-    } else {
-      AUTO_ADVANCE_MS
+  LaunchedEffect(index, current.id, current.type, videoCompleted) {
+    if (current.type == StatusType.VIDEO) {
+      if (videoCompleted) {
+        advanceOrClose(index, statuses.lastIndex, onClose) { index = it }
+      }
+      return@LaunchedEffect
     }
+    val duration = AUTO_ADVANCE_MS
     delay(duration)
-    if (index < statuses.lastIndex) {
-      index += 1
-    } else {
-      onClose()
-    }
+    advanceOrClose(index, statuses.lastIndex, onClose) { index = it }
   }
 
   Box(
@@ -119,7 +137,7 @@ fun StatusViewerScreen(
           )
         }
       }
-      StatusType.IMAGE, StatusType.VIDEO -> {
+      StatusType.IMAGE -> {
         GlideImage(
           modifier = Modifier.fillMaxSize(),
           imageModel = { current.mediaUrl },
@@ -140,9 +158,26 @@ fun StatusViewerScreen(
           )
         }
       }
+      StatusType.VIDEO -> {
+        StatusVideoPlayer(
+          mediaUrl = current.mediaUrl,
+          onComplete = { videoCompleted = true },
+          modifier = Modifier.fillMaxSize()
+        )
+        if (current.text.isNotBlank()) {
+          Text(
+            modifier = Modifier
+              .align(Alignment.BottomCenter)
+              .padding(24.dp),
+            text = current.text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.White,
+            textAlign = TextAlign.Center
+          )
+        }
+      }
     }
 
-    // Tap zones: left = previous, right = next
     Row(modifier = Modifier.fillMaxSize()) {
       Box(
         modifier = Modifier
@@ -185,7 +220,8 @@ fun StatusViewerScreen(
       StatusProgressBars(
         count = statuses.size,
         currentIndex = index,
-        key = current.id
+        key = current.id,
+        durationMs = if (current.type == StatusType.VIDEO) AUTO_ADVANCE_MS * 3 else AUTO_ADVANCE_MS
       )
 
       Row(
@@ -212,6 +248,20 @@ fun StatusViewerScreen(
             color = Color.White
           )
         }
+        if (isOwnStatus) {
+          IconButton(
+            onClick = {
+              onShowViewers(current)
+              showViewersSheet = true
+            }
+          ) {
+            Icon(
+              imageVector = Icons.Default.Visibility,
+              contentDescription = stringResource(id = R.string.status_viewers),
+              tint = Color.White
+            )
+          }
+        }
         IconButton(onClick = onClose) {
           Icon(
             imageVector = Icons.Default.Close,
@@ -221,6 +271,113 @@ fun StatusViewerScreen(
         }
       }
     }
+
+    if (isOwnStatus && showViewersSheet) {
+      val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+      ModalBottomSheet(
+        onDismissRequest = { showViewersSheet = false },
+        sheetState = sheetState
+      ) {
+        StatusViewersSheet(
+          status = current,
+          viewerNames = viewerNames,
+          isLoading = isLoadingViewers
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun StatusViewersSheet(
+  status: StatusItem,
+  viewerNames: Map<String, String>,
+  isLoading: Boolean
+) {
+  Column(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(bottom = 24.dp)
+  ) {
+    Text(
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+      text = stringResource(id = R.string.status_viewed_by_count, status.viewedBy.size),
+      style = MaterialTheme.typography.titleMedium
+    )
+    if (isLoading) {
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(32.dp),
+        contentAlignment = Alignment.Center
+      ) {
+        CircularProgressIndicator()
+      }
+    } else if (status.viewedBy.isEmpty()) {
+      Text(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+        text = stringResource(id = R.string.status_no_viewers),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
+    } else {
+      LazyColumn {
+        items(status.viewedBy.distinct(), key = { it }) { viewerId ->
+          Text(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 16.dp, vertical = 12.dp),
+            text = viewerNames[viewerId] ?: viewerId,
+            style = MaterialTheme.typography.bodyLarge
+          )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun StatusVideoPlayer(
+  mediaUrl: String,
+  onComplete: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  AndroidView(
+    modifier = modifier,
+    factory = { ctx ->
+      VideoView(ctx).apply {
+        setOnCompletionListener { onComplete() }
+        setOnErrorListener { _, _, _ ->
+          onComplete()
+          true
+        }
+      }
+    },
+    update = { videoView ->
+      val uri = Uri.parse(mediaUrl)
+      if (videoView.tag != mediaUrl) {
+        videoView.tag = mediaUrl
+        videoView.setVideoURI(uri)
+        videoView.setOnPreparedListener { it.start() }
+      }
+    }
+  )
+
+  DisposableEffect(mediaUrl) {
+    onDispose { }
+  }
+}
+
+private fun advanceOrClose(
+  index: Int,
+  lastIndex: Int,
+  onClose: () -> Unit,
+  setIndex: (Int) -> Unit
+) {
+  if (index < lastIndex) {
+    setIndex(index + 1)
+  } else {
+    onClose()
   }
 }
 
@@ -228,7 +385,8 @@ fun StatusViewerScreen(
 private fun StatusProgressBars(
   count: Int,
   currentIndex: Int,
-  key: String
+  key: String,
+  durationMs: Long = AUTO_ADVANCE_MS
 ) {
   val progress = remember(key) { Animatable(0f) }
 
@@ -237,7 +395,7 @@ private fun StatusProgressBars(
     progress.animateTo(
       targetValue = 1f,
       animationSpec = tween(
-        durationMillis = AUTO_ADVANCE_MS.toInt(),
+        durationMillis = durationMs.toInt(),
         easing = LinearEasing
       )
     )

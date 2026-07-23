@@ -38,6 +38,11 @@ data class StatusUiState(
   val errorMessage: String? = null
 )
 
+data class StatusViewerInfo(
+  val viewerNames: Map<String, String> = emptyMap(),
+  val isLoadingViewers: Boolean = false
+)
+
 @HiltViewModel
 class StatusViewModel @Inject constructor(
   private val statusRepository: StatusRepository
@@ -46,6 +51,8 @@ class StatusViewModel @Inject constructor(
   private val _isSaving = MutableStateFlow(false)
   private val _errorMessage = MutableStateFlow<String?>(null)
   private val _isLoading = MutableStateFlow(true)
+  private val _viewerInfo = MutableStateFlow(StatusViewerInfo())
+  val viewerInfo: StateFlow<StatusViewerInfo> = _viewerInfo
   private var hasLoadedOnce = false
 
   val uiState: StateFlow<StatusUiState> = combine(
@@ -72,7 +79,6 @@ class StatusViewModel @Inject constructor(
     initialValue = StatusUiState()
   )
 
-  /** Call when the Status tab becomes the settled page. */
   fun onTabActive() {
     if (!hasLoadedOnce || uiState.value.myStatuses.isEmpty() && uiState.value.contactStatuses.isEmpty()) {
       refresh()
@@ -83,6 +89,7 @@ class StatusViewModel @Inject constructor(
     viewModelScope.launch {
       _isLoading.value = !hasLoadedOnce
       statusRepository.refresh()
+        .onFailure { _errorMessage.value = it.message ?: "Could not load statuses" }
       hasLoadedOnce = true
       _isLoading.value = false
     }
@@ -110,10 +117,35 @@ class StatusViewModel @Inject constructor(
     }
   }
 
+  fun createVideoStatus(uri: Uri, caption: String = "", onDone: () -> Unit = {}) {
+    viewModelScope.launch {
+      _isSaving.value = true
+      _errorMessage.value = null
+      statusRepository.createVideoStatus(uri, caption)
+        .onFailure { _errorMessage.value = it.message }
+      _isSaving.value = false
+      onDone()
+    }
+  }
+
   fun markViewed(statusId: String) {
     viewModelScope.launch {
       statusRepository.markViewed(statusId)
     }
+  }
+
+  fun loadViewersForStatus(status: StatusItem) {
+    val myId = statusRepository.currentUserId() ?: return
+    if (status.userId != myId) return
+    viewModelScope.launch {
+      _viewerInfo.value = StatusViewerInfo(isLoadingViewers = true)
+      val names = statusRepository.resolveViewerNames(status.viewedBy)
+      _viewerInfo.value = StatusViewerInfo(viewerNames = names, isLoadingViewers = false)
+    }
+  }
+
+  fun clearViewerInfo() {
+    _viewerInfo.value = StatusViewerInfo()
   }
 
   fun statusesForUser(userId: String): List<StatusItem> {
@@ -122,6 +154,9 @@ class StatusViewModel @Inject constructor(
       .filter { it.userId == userId }
       .sortedBy { it.createdAt }
   }
+
+  fun isOwnStatusUser(userId: String): Boolean =
+    statusRepository.currentUserId() == userId
 
   fun clearError() {
     _errorMessage.value = null

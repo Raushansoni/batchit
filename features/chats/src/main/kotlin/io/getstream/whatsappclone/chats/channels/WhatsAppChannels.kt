@@ -23,12 +23,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,9 +45,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import io.getstream.chat.android.client.ChatClient
-import io.getstream.chat.android.compose.ui.channels.ChannelsScreen
+import io.getstream.chat.android.compose.ui.channels.list.ChannelList
+import io.getstream.chat.android.compose.viewmodel.channels.ChannelListViewModel
+import io.getstream.chat.android.compose.viewmodel.channels.ChannelViewModelFactory
 import io.getstream.chat.android.models.Channel
+import io.getstream.chat.android.models.querysort.QuerySortByField
+import io.getstream.chat.android.models.Filters
+import io.getstream.whatsappclone.chats.friends.BatchItUser
 import io.getstream.whatsappclone.chats.R
 import io.getstream.whatsappclone.chats.theme.WhatsAppChatTheme
 import io.getstream.whatsappclone.designsystem.component.BatchItFab
@@ -53,6 +65,7 @@ fun WhatsAppChannels(
   whatsChannelsViewModel: WhatsChannelsViewModel = hiltViewModel()
 ) {
   var showGroupDialog by remember { mutableStateOf(false) }
+  var optionsChannel by remember { mutableStateOf<Channel?>(null) }
   val currentUser by ChatClient.instance().clientState.user.collectAsStateWithLifecycle()
   val error by whatsChannelsViewModel.error.collectAsStateWithLifecycle()
 
@@ -70,9 +83,21 @@ fun WhatsAppChannels(
           WhatsAppLoadingIndicator()
         }
       } else {
-        ChannelsScreen(
-          isShowingHeader = false,
-          onChannelClick = onChannelClick
+        val listViewModel: ChannelListViewModel = viewModel(
+          factory = ChannelViewModelFactory(
+            chatClient = ChatClient.instance(),
+            filters = Filters.and(
+              Filters.eq("type", "messaging"),
+              Filters.`in`("members", listOf(currentUser!!.id))
+            ),
+            querySort = QuerySortByField.descByName("last_updated")
+          )
+        )
+
+        ChannelList(
+          viewModel = listViewModel,
+          onChannelClick = onChannelClick,
+          onChannelLongClick = { channel -> optionsChannel = channel }
         )
       }
 
@@ -101,12 +126,39 @@ fun WhatsAppChannels(
     }
   }
 
+  optionsChannel?.let { channel ->
+    val isMuted = currentUser?.channelMutes?.any { it.channel?.cid == channel.cid } == true
+    ChannelOptionsDialog(
+      channel = channel,
+      isPinned = whatsChannelsViewModel.isPinned(channel),
+      isMuted = isMuted,
+      onDismiss = { optionsChannel = null },
+      onMuteToggle = {
+        if (isMuted) {
+          whatsChannelsViewModel.unmuteChannel(channel)
+        } else {
+          whatsChannelsViewModel.muteChannel(channel)
+        }
+        optionsChannel = null
+      },
+      onArchive = {
+        whatsChannelsViewModel.archiveChannel(channel)
+        optionsChannel = null
+      },
+      onPinToggle = {
+        whatsChannelsViewModel.togglePin(channel)
+        optionsChannel = null
+      }
+    )
+  }
+
   if (showGroupDialog) {
-    NewGroupDialog(
+    NewGroupFriendsDialog(
+      viewModel = whatsChannelsViewModel,
       onDismiss = { showGroupDialog = false },
-      onCreate = { name, memberUsernames ->
+      onCreate = { name, memberIds ->
         showGroupDialog = false
-        whatsChannelsViewModel.createGroupChannel(name, memberUsernames)
+        whatsChannelsViewModel.createGroupChannelByMemberIds(name, memberIds)
       }
     )
   }
@@ -126,12 +178,64 @@ fun WhatsAppChannels(
 }
 
 @Composable
-private fun NewGroupDialog(
+private fun ChannelOptionsDialog(
+  channel: Channel,
+  isPinned: Boolean,
+  isMuted: Boolean,
+  onDismiss: () -> Unit,
+  onMuteToggle: () -> Unit,
+  onArchive: () -> Unit,
+  onPinToggle: () -> Unit
+) {
+  val title = channel.name.takeIf { !it.isNullOrBlank() }
+    ?: channel.members.joinToString { it.user.name }
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text(text = title) },
+    text = {
+      Column {
+        TextButton(onClick = onMuteToggle, modifier = Modifier.fillMaxWidth()) {
+          Text(
+            text = stringResource(
+              id = if (isMuted) R.string.channel_unmute else R.string.channel_mute
+            )
+          )
+        }
+        TextButton(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {
+          Text(text = stringResource(id = R.string.channel_archive))
+        }
+        TextButton(onClick = onPinToggle, modifier = Modifier.fillMaxWidth()) {
+          Text(
+            text = stringResource(
+              id = if (isPinned) R.string.channel_unpin else R.string.channel_pin
+            )
+          )
+        }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = onDismiss) {
+        Text(text = stringResource(id = R.string.cancel))
+      }
+    }
+  )
+}
+
+@Composable
+private fun NewGroupFriendsDialog(
+  viewModel: WhatsChannelsViewModel,
   onDismiss: () -> Unit,
   onCreate: (String, List<String>) -> Unit
 ) {
   var groupName by remember { mutableStateOf("") }
-  var memberUsernames by remember { mutableStateOf("") }
+  var selectedIds by remember { mutableStateOf(setOf<String>()) }
+  val friends by viewModel.groupFriends.collectAsStateWithLifecycle()
+  val isLoading by viewModel.isLoadingGroupFriends.collectAsStateWithLifecycle()
+
+  LaunchedEffect(Unit) {
+    viewModel.loadGroupFriends()
+  }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -146,26 +250,53 @@ private fun NewGroupDialog(
           singleLine = true
         )
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-          modifier = Modifier.fillMaxWidth(),
-          value = memberUsernames,
-          onValueChange = { memberUsernames = it },
-          label = { Text(text = stringResource(id = R.string.member_usernames_hint)) },
-          singleLine = true
+        Text(
+          text = stringResource(id = R.string.group_select_friends),
+          style = MaterialTheme.typography.bodyMedium
         )
+        Spacer(modifier = Modifier.height(4.dp))
+        if (isLoading) {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(16.dp),
+            contentAlignment = Alignment.Center
+          ) {
+            CircularProgressIndicator()
+          }
+        } else if (friends.isEmpty()) {
+          Text(
+            text = stringResource(id = R.string.group_no_friends),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        } else {
+          LazyColumn(modifier = Modifier.height(220.dp)) {
+            items(friends, key = { it.uid }) { friend ->
+              GroupFriendCheckboxRow(
+                friend = friend,
+                checked = friend.uid in selectedIds,
+                onCheckedChange = { checked ->
+                  selectedIds = if (checked) {
+                    selectedIds + friend.uid
+                  } else {
+                    selectedIds - friend.uid
+                  }
+                }
+              )
+            }
+          }
+        }
       }
     },
     confirmButton = {
       TextButton(
         onClick = {
-          if (groupName.isNotBlank()) {
-            val members = memberUsernames.split(",")
-              .map { it.trim().removePrefix("@") }
-              .filter { it.isNotEmpty() }
-            onCreate(groupName.trim(), members)
+          if (groupName.isNotBlank() && selectedIds.isNotEmpty()) {
+            onCreate(groupName.trim(), selectedIds.toList())
           }
         },
-        enabled = groupName.isNotBlank()
+        enabled = groupName.isNotBlank() && selectedIds.isNotEmpty()
       ) {
         Text(text = stringResource(id = R.string.create_group))
       }
@@ -176,4 +307,30 @@ private fun NewGroupDialog(
       }
     }
   )
+}
+
+@Composable
+private fun GroupFriendCheckboxRow(
+  friend: BatchItUser,
+  checked: Boolean,
+  onCheckedChange: (Boolean) -> Unit
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(vertical = 4.dp),
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+    Column(modifier = Modifier.padding(start = 4.dp)) {
+      Text(text = friend.name.ifBlank { friend.username })
+      if (friend.username.isNotBlank()) {
+        Text(
+          text = "@${friend.username}",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
+    }
+  }
 }

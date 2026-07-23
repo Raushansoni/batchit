@@ -39,7 +39,6 @@ import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingColumn
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
 import io.getstream.whatsappclone.model.WhatsAppUser
 import io.getstream.whatsappclone.uistate.WhatsAppUserUiState
-import java.util.UUID
 
 @Composable
 fun WhatsAppCalls(
@@ -50,20 +49,10 @@ fun WhatsAppCalls(
     { user: WhatsAppUser -> whatsAppCallsViewModel.navigateToCallInfo(user) }
   }
   val onVideoCall = remember(whatsAppCallsViewModel) {
-    {
-      whatsAppCallsViewModel.startCall(
-        callId = UUID.randomUUID().toString(),
-        videoCall = true
-      )
-    }
+    { whatsAppCallsViewModel.openFriendsForCall(videoCall = true) }
   }
   val onAudioCall = remember(whatsAppCallsViewModel) {
-    {
-      whatsAppCallsViewModel.startCall(
-        callId = UUID.randomUUID().toString(),
-        videoCall = false
-      )
-    }
+    { whatsAppCallsViewModel.openFriendsForCall(videoCall = false) }
   }
 
   Box(modifier = Modifier.fillMaxSize()) {
@@ -106,14 +95,25 @@ private fun WhatsAppCallsScreen(
     WhatsAppUserUiState.Loading -> WhatsAppLoadingColumn()
     WhatsAppUserUiState.Error -> WhatsAppError()
     is WhatsAppUserUiState.Success -> {
-      LazyColumn {
-        items(
-          items = whatsAppUsersUiState.data.whatsappUserList,
-          key = { it.name },
-          contentType = { "call-history" }
-        ) { user ->
-          WhatsAppCallHistory(whatsAppUser = user) {
-            onHistoryItemClick(user)
+      val users = whatsAppUsersUiState.data.whatsappUserList
+      if (users.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+          androidx.compose.material3.Text(
+            text = "No calls yet — tap a friend to start",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+      } else {
+        LazyColumn {
+          items(
+            items = users,
+            key = { "${it.cell}-${it.registrationDate}" },
+            contentType = { "call-history" }
+          ) { user ->
+            WhatsAppCallHistory(whatsAppUser = user) {
+              onHistoryItemClick(user)
+            }
           }
         }
       }

@@ -14,4 +14,9 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<manifest package="io.getstream.whatsappclone.camera" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-feature
+    android:name="android.hardware.camera"
+    android:required="false" />
+  <uses-permission android:name="android.permission.CAMERA" />
+</manifest>

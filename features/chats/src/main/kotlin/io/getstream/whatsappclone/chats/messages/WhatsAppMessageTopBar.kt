@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,8 +33,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.getstream.whatsappclone.chats.R
 import io.getstream.whatsappclone.designsystem.component.BatchItAvatar
 import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
@@ -44,7 +49,9 @@ import io.getstream.whatsappclone.uistate.WhatsAppMessageUiState
 fun WhatsAppMessageTopBar(
   messageUiState: WhatsAppMessageUiState,
   navigateToVideoCall: (Boolean) -> Unit,
-  onBackClick: () -> Unit
+  onBackClick: () -> Unit,
+  onStarLatestMessage: () -> Unit = {},
+  onShareLocation: () -> Unit = {}
 ) {
   val chrome = getChromeContentColor()
 
@@ -67,6 +74,22 @@ fun WhatsAppMessageTopBar(
       )
     },
     actions = {
+      IconButton(onClick = onShareLocation) {
+        Icon(
+          modifier = Modifier.size(24.dp),
+          imageVector = Icons.Default.LocationOn,
+          tint = chrome,
+          contentDescription = stringResource(id = R.string.share_location)
+        )
+      }
+      IconButton(onClick = onStarLatestMessage) {
+        Icon(
+          modifier = Modifier.size(24.dp),
+          imageVector = Icons.Default.Star,
+          tint = chrome,
+          contentDescription = stringResource(id = R.string.star_message)
+        )
+      }
       IconButton(onClick = { navigateToVideoCall(true) }) {
         Icon(
           modifier = Modifier.size(24.dp),

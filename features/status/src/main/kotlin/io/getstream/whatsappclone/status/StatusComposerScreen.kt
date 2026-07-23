@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,16 +66,28 @@ fun StatusComposerScreen(
   isSaving: Boolean,
   onClose: () -> Unit,
   onPostText: (String) -> Unit,
-  onPostImage: (Uri, String) -> Unit
+  onPostImage: (Uri, String) -> Unit,
+  onPostVideo: (Uri, String) -> Unit
 ) {
   var text by remember { mutableStateOf("") }
   var selectedImage by remember { mutableStateOf<Uri?>(null) }
+  var selectedVideo by remember { mutableStateOf<Uri?>(null) }
 
   val imagePicker = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.GetContent()
   ) { uri ->
     if (uri != null) {
       selectedImage = uri
+      selectedVideo = null
+    }
+  }
+
+  val videoPicker = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.GetContent()
+  ) { uri ->
+    if (uri != null) {
+      selectedVideo = uri
+      selectedImage = null
     }
   }
 
@@ -113,29 +126,47 @@ fun StatusComposerScreen(
           .padding(16.dp),
         contentAlignment = Alignment.Center
       ) {
-        val image = selectedImage
-        if (image != null) {
-          GlideImage(
-            modifier = Modifier
-              .fillMaxSize()
-              .clip(RoundedCornerShape(8.dp)),
-            imageModel = { image },
-            imageOptions = ImageOptions(contentScale = ContentScale.Fit)
-          )
-        } else {
-          OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = text,
-            onValueChange = { text = it },
-            placeholder = {
-              Text(
-                text = stringResource(id = R.string.status_type_hint),
-                color = Color.White.copy(alpha = 0.6f)
+        when {
+          selectedImage != null -> {
+            GlideImage(
+              modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(8.dp)),
+              imageModel = { selectedImage },
+              imageOptions = ImageOptions(contentScale = ContentScale.Fit)
+            )
+          }
+          selectedVideo != null -> {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+              Icon(
+                imageVector = Icons.Default.Videocam,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(64.dp)
               )
-            },
-            textStyle = MaterialTheme.typography.headlineSmall.copy(color = Color.White),
-            enabled = !isSaving
-          )
+              Spacer(modifier = Modifier.size(12.dp))
+              Text(
+                text = stringResource(id = R.string.status_video_selected),
+                color = Color.White,
+                style = MaterialTheme.typography.bodyLarge
+              )
+            }
+          }
+          else -> {
+            OutlinedTextField(
+              modifier = Modifier.fillMaxWidth(),
+              value = text,
+              onValueChange = { text = it },
+              placeholder = {
+                Text(
+                  text = stringResource(id = R.string.status_type_hint),
+                  color = Color.White.copy(alpha = 0.6f)
+                )
+              },
+              textStyle = MaterialTheme.typography.headlineSmall.copy(color = Color.White),
+              enabled = !isSaving
+            )
+          }
         }
       }
 
@@ -146,31 +177,50 @@ fun StatusComposerScreen(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
       ) {
-        TextButton(
-          onClick = { imagePicker.launch("image/*") },
-          enabled = !isSaving
-        ) {
-          Icon(
-            imageVector = Icons.Default.Image,
-            contentDescription = null,
-            tint = Color.White
-          )
-          Spacer(modifier = Modifier.size(8.dp))
-          Text(
-            text = stringResource(id = R.string.status_pick_image),
-            color = Color.White
-          )
+        Row {
+          TextButton(
+            onClick = { imagePicker.launch("image/*") },
+            enabled = !isSaving
+          ) {
+            Icon(
+              imageVector = Icons.Default.Image,
+              contentDescription = null,
+              tint = Color.White
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(
+              text = stringResource(id = R.string.status_pick_image),
+              color = Color.White
+            )
+          }
+          TextButton(
+            onClick = { videoPicker.launch("video/*") },
+            enabled = !isSaving
+          ) {
+            Icon(
+              imageVector = Icons.Default.Videocam,
+              contentDescription = null,
+              tint = Color.White
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(
+              text = stringResource(id = R.string.status_pick_video),
+              color = Color.White
+            )
+          }
         }
 
         Button(
           onClick = {
             val image = selectedImage
+            val video = selectedVideo
             when {
               image != null -> onPostImage(image, text)
+              video != null -> onPostVideo(video, text)
               text.isNotBlank() -> onPostText(text)
             }
           },
-          enabled = !isSaving && (selectedImage != null || text.isNotBlank()),
+          enabled = !isSaving && (selectedImage != null || selectedVideo != null || text.isNotBlank()),
           colors = ButtonDefaults.buttonColors(containerColor = GREEN500),
           shape = CircleShape,
           modifier = Modifier.size(48.dp)

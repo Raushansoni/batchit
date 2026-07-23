@@ -38,7 +38,9 @@ import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicato
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppNavHost
+import io.getstream.whatsappclone.navigation.WhatsAppScreens
 import io.getstream.whatsappclone.settings.SettingsViewModel
+import io.getstream.whatsappclone.video.IncomingCallOverlay
 
 @Composable
 fun WhatsAppCloneMain(
@@ -77,10 +79,22 @@ fun WhatsAppCloneMain(
           LaunchedEffect(navHostController) {
             composeNavigator.handleNavigationCommands(navHostController)
           }
-          WhatsAppNavHost(
-            navHostController = navHostController,
-            composeNavigator = composeNavigator
-          )
+          Box(modifier = Modifier.fillMaxSize()) {
+            WhatsAppNavHost(
+              navHostController = navHostController,
+              composeNavigator = composeNavigator
+            )
+            IncomingCallOverlay(
+              onCallConnected = { callId, video ->
+                composeNavigator.navigate(
+                  WhatsAppScreens.VideoCall.createRoute(
+                    callId = callId,
+                    videoCall = video
+                  )
+                )
+              }
+            )
+          }
         }
 
         else -> {

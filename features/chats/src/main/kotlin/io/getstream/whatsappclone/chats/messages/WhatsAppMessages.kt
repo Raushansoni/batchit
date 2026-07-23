@@ -18,15 +18,20 @@ package io.getstream.whatsappclone.chats.messages
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.getstream.chat.android.compose.ui.messages.MessagesScreen
 import io.getstream.chat.android.compose.viewmodel.messages.MessagesViewModelFactory
+import io.getstream.whatsappclone.chats.R
 import io.getstream.whatsappclone.chats.theme.WhatsAppChatTheme
 
 @Composable
@@ -35,6 +40,7 @@ fun WhatsAppMessages(
   whatsAppMessagesViewModel: WhatsAppMessagesViewModel = hiltViewModel()
 ) {
   val messageUiState by whatsAppMessagesViewModel.messageUiSate.collectAsStateWithLifecycle()
+  val actionMessage by whatsAppMessagesViewModel.actionMessage.collectAsStateWithLifecycle()
   val context = LocalContext.current
   val factory = remember(channelId, context) {
     MessagesViewModelFactory(
@@ -55,7 +61,9 @@ fun WhatsAppMessages(
       WhatsAppMessageTopBar(
         messageUiState = messageUiState,
         navigateToVideoCall = onVideoCall,
-        onBackClick = onBack
+        onBackClick = onBack,
+        onStarLatestMessage = whatsAppMessagesViewModel::starLatestMessage,
+        onShareLocation = whatsAppMessagesViewModel::shareLocationPlaceholder
       )
 
       MessagesScreen(
@@ -64,5 +72,17 @@ fun WhatsAppMessages(
         onBackPressed = onBack
       )
     }
+  }
+
+  actionMessage?.let { message ->
+    AlertDialog(
+      onDismissRequest = whatsAppMessagesViewModel::clearActionMessage,
+      text = { Text(text = message) },
+      confirmButton = {
+        TextButton(onClick = whatsAppMessagesViewModel::clearActionMessage) {
+          Text(text = stringResource(id = R.string.cancel))
+        }
+      }
+    )
   }
 }

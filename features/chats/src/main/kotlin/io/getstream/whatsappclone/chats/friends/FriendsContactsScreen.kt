@@ -98,10 +98,26 @@ fun FriendsContactsScreen(
     }
   }
 
+  val screenTitle = when (state.mode) {
+    FriendsPickerMode.CallAudio -> stringResource(id = R.string.friends_title_call_audio)
+    FriendsPickerMode.CallVideo -> stringResource(id = R.string.friends_title_call_video)
+    FriendsPickerMode.Chat -> stringResource(id = R.string.friends_title)
+  }
+  val primaryActionLabel = when (state.mode) {
+    FriendsPickerMode.CallAudio -> stringResource(id = R.string.friends_call_audio)
+    FriendsPickerMode.CallVideo -> stringResource(id = R.string.friends_call_video)
+    FriendsPickerMode.Chat -> stringResource(id = R.string.friends_chat)
+  }
+  val addButtonLabel = when (state.mode) {
+    FriendsPickerMode.CallAudio -> stringResource(id = R.string.friends_add_and_call_audio)
+    FriendsPickerMode.CallVideo -> stringResource(id = R.string.friends_add_and_call_video)
+    FriendsPickerMode.Chat -> stringResource(id = R.string.friends_add_and_chat)
+  }
+
   Scaffold(
     topBar = {
       TopAppBar(
-        title = { Text(text = stringResource(id = R.string.friends_title)) },
+        title = { Text(text = screenTitle) },
         navigationIcon = {
           IconButton(onClick = viewModel::navigateUp) {
             Icon(
@@ -147,7 +163,7 @@ fun FriendsContactsScreen(
         enabled = state.query.isNotBlank() && !state.isLoading,
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
       ) {
-        Text(text = stringResource(id = R.string.friends_add_and_chat), color = MaterialTheme.colorScheme.onSecondary)
+        Text(text = addButtonLabel, color = MaterialTheme.colorScheme.onSecondary)
       }
 
       state.error?.let {
@@ -178,8 +194,8 @@ fun FriendsContactsScreen(
               FriendRow(
                 title = friend.name.ifBlank { friend.username },
                 subtitle = "@${friend.username}",
-                actionLabel = stringResource(id = R.string.friends_chat),
-                onAction = { viewModel.startChatWithUser(friend) }
+                actionLabel = primaryActionLabel,
+                onAction = { viewModel.onFriendSelected(friend) }
               )
             }
           }
@@ -225,7 +241,7 @@ fun FriendsContactsScreen(
                     id = R.string.friends_on_batchit,
                     onBatchIt.username
                   ),
-                  actionLabel = stringResource(id = R.string.friends_chat),
+                  actionLabel = primaryActionLabel,
                   onAction = { viewModel.addFriendAndChat(onBatchIt) }
                 )
               } else {

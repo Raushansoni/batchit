@@ -24,6 +24,11 @@
   <string name="status_compose_text">Text status</string>
   <string name="status_type_hint">Type a status…</string>
   <string name="status_pick_image">Photo</string>
+  <string name="status_pick_video">Video</string>
+  <string name="status_video_selected">Video selected</string>
   <string name="status_post">Post</string>
   <string name="status_close">Close</string>
+  <string name="status_viewers">Viewers</string>
+  <string name="status_viewed_by_count">Viewed by %1$d</string>
+  <string name="status_no_viewers">No views yet</string>
 </resources>

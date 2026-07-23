@@ -16,6 +16,7 @@
 
 package io.getstream.whatsappclone.data.repository
 
+import io.getstream.whatsappclone.model.CallRecord
 import io.getstream.whatsappclone.model.WhatsAppUser
 import kotlinx.coroutines.flow.Flow
 
@@ -24,4 +25,6 @@ interface CallHistoryRepository {
   fun getCallHistoryUsersStream(): Flow<Result<List<WhatsAppUser>>>
 
   suspend fun updateCallCallHistoryUsers(whatsappUsers: Result<List<WhatsAppUser>>)
+
+  fun recordCall(record: CallRecord)
 }

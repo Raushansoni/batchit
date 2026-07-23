@@ -157,6 +157,18 @@ class AuthViewModel @Inject constructor(
     }
   }
 
+  fun deleteAccount() {
+    viewModelScope.launch {
+      authRepository.deleteAccount()
+        .onSuccess { _uiState.value = AuthUiState.GoogleSignIn }
+        .onFailure { error ->
+          _uiState.value = AuthUiState.Error(
+            error.message ?: "Failed to delete account"
+          )
+        }
+    }
+  }
+
   private fun nextOnboardingState(): AuthUiState {
     if (!BatchItAuthConfig.USE_DEMO_AUTH && !authRepository.hasUsername()) {
       return AuthUiState.UsernameSetup

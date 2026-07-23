@@ -45,6 +45,7 @@ import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -78,6 +79,7 @@ fun BatchItSettingsScreen(
   onNotificationsClick: () -> Unit = {},
   onStorageClick: () -> Unit = {},
   onHelpClick: () -> Unit = {},
+  onStarredMessagesClick: () -> Unit = {},
   onDeleteAccountClick: () -> Unit = {},
   onSignOutClick: () -> Unit = {},
   settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -94,6 +96,7 @@ fun BatchItSettingsScreen(
     onNotificationsClick = onNotificationsClick,
     onStorageClick = onStorageClick,
     onHelpClick = onHelpClick,
+    onStarredMessagesClick = onStarredMessagesClick,
     onDeleteAccountClick = onDeleteAccountClick,
     onSignOutClick = onSignOutClick
   )
@@ -109,6 +112,7 @@ private fun BatchItSettingsContent(
   onNotificationsClick: () -> Unit,
   onStorageClick: () -> Unit,
   onHelpClick: () -> Unit,
+  onStarredMessagesClick: () -> Unit,
   onDeleteAccountClick: () -> Unit,
   onSignOutClick: () -> Unit
 ) {
@@ -188,6 +192,11 @@ private fun BatchItSettingsContent(
       icon = Icons.Outlined.Storage,
       title = stringResource(id = R.string.settings_storage),
       onClick = onStorageClick
+    )
+    SettingsRow(
+      icon = Icons.Outlined.StarOutline,
+      title = stringResource(id = R.string.settings_starred_messages),
+      onClick = onStarredMessagesClick
     )
     SettingsRow(
       icon = Icons.Outlined.HelpOutline,
@@ -366,6 +375,7 @@ private fun BatchItSettingsScreenPreview() {
       onNotificationsClick = {},
       onStorageClick = {},
       onHelpClick = {},
+      onStarredMessagesClick = {},
       onDeleteAccountClick = {},
       onSignOutClick = {}
     )

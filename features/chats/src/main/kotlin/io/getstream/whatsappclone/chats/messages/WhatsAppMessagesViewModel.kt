@@ -22,9 +22,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.client.api.models.QueryChannelRequest
+import io.getstream.chat.android.models.Message
+import io.getstream.whatsappclone.chats.starred.StarredMessagesStore
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
 import io.getstream.whatsappclone.uistate.WhatsAppMessageUiState
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,11 +37,15 @@ import kotlinx.coroutines.launch
 class WhatsAppMessagesViewModel @Inject constructor(
   private val chatClient: ChatClient,
   private val composeNavigator: AppComposeNavigator,
+  private val starredMessagesStore: StarredMessagesStore,
   savedStateHandle: SavedStateHandle
 ) : ViewModel() {
   private val messageMutableUiState =
     MutableStateFlow<WhatsAppMessageUiState>(WhatsAppMessageUiState.Loading)
   val messageUiSate: StateFlow<WhatsAppMessageUiState> = messageMutableUiState
+
+  private val _actionMessage = MutableStateFlow<String?>(null)
+  val actionMessage: StateFlow<String?> = _actionMessage
 
   private val channelId = savedStateHandle.get<String>("channelId")
 
@@ -54,13 +61,58 @@ class WhatsAppMessagesViewModel @Inject constructor(
     }
   }
 
+  fun clearActionMessage() {
+    _actionMessage.value = null
+  }
+
   fun navigateToVideoCall(channelId: String, videoCall: Boolean) {
-    composeNavigator.navigate(
-      WhatsAppScreens.VideoCall.createRoute(
-        callId = channelId,
-        videoCall = videoCall
+    viewModelScope.launch {
+      val me = chatClient.getCurrentUser()?.id
+      val request = QueryChannelRequest().withState()
+      val channelResult = chatClient.channel(channelId).query(request).await()
+      val memberIds = channelResult.getOrNull()?.members
+        ?.mapNotNull { it.user.id }
+        ?.filter { it != me }
+        .orEmpty()
+      val members = memberIds.joinToString(",")
+
+      composeNavigator.navigate(
+        WhatsAppScreens.VideoCall.createRoute(
+          callId = UUID.randomUUID().toString(),
+          videoCall = videoCall,
+          members = members
+        )
       )
-    )
+    }
+  }
+
+  fun starLatestMessage() {
+    val cid = channelId ?: return
+    viewModelScope.launch {
+      val request = QueryChannelRequest().withMessages(1)
+      val result = chatClient.channel(cid).query(request).await()
+      val latest = result.getOrNull()?.messages?.lastOrNull()
+      if (latest == null) {
+        _actionMessage.value = "No messages to star"
+        return@launch
+      }
+      starredMessagesStore.star(
+        messageId = latest.id,
+        channelId = cid,
+        previewText = latest.text
+      )
+      _actionMessage.value = "Message starred"
+    }
+  }
+
+  fun shareLocationPlaceholder() {
+    val cid = channelId ?: return
+    viewModelScope.launch {
+      val text = "Location sharing: open Maps and paste a link"
+      chatClient.channel(cid).sendMessage(Message(text = text)).await()
+        .onSuccess { _actionMessage.value = "Location hint sent" }
+        .onError { _actionMessage.value = it.message ?: "Could not send location" }
+    }
   }
 
   /**

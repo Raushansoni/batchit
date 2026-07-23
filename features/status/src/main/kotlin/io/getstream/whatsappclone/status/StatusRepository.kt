@@ -61,8 +61,7 @@ class StatusRepository @Inject constructor() {
   private fun authOrNull(): FirebaseAuth? =
     runCatching { FirebaseAuth.getInstance() }.getOrNull()
 
-  fun currentUserId(): String =
-    authOrNull()?.currentUser?.uid ?: DEMO_USER_ID
+  fun currentUserId(): String? = authOrNull()?.currentUser?.uid
 
   fun currentUserName(): String =
     authOrNull()?.currentUser?.displayName?.takeIf { it.isNotBlank() } ?: "You"
@@ -70,21 +69,32 @@ class StatusRepository @Inject constructor() {
   fun currentUserImage(): String =
     authOrNull()?.currentUser?.photoUrl?.toString().orEmpty()
 
-  suspend fun refresh() {
-    try {
-      loadFromFirebase()
-      useDemoFallback = false
-    } catch (e: Exception) {
-      logger.e(e) { "Firebase status load failed — using demo data" }
-      useDemoFallback = true
-      ensureDemoStatuses()
+  suspend fun refresh(): Result<Unit> {
+    if (useDemoFallback) {
       emitDemoStatuses()
+      return Result.success(Unit)
+    }
+    return try {
+      loadFromFirebase()
+      Result.success(Unit)
+    } catch (e: Exception) {
+      logger.e(e) { "Firebase status load failed" }
+      _myStatuses.value = emptyList()
+      _contactStatuses.value = emptyList()
+      if (ENABLE_DEMO_FALLBACK) {
+        useDemoFallback = true
+        ensureDemoStatuses()
+        emitDemoStatuses()
+        Result.success(Unit)
+      } else {
+        Result.failure(e)
+      }
     }
   }
 
   private suspend fun loadFromFirebase() {
     val db = firestoreOrNull() ?: error("Firestore unavailable")
-    val uid = currentUserId()
+    val uid = currentUserId() ?: error("Not signed in")
     val now = System.currentTimeMillis()
 
     val snapshot = db.collection(COLLECTION)
@@ -114,11 +124,12 @@ class StatusRepository @Inject constructor() {
   suspend fun createTextStatus(text: String): Result<StatusItem> {
     val trimmed = text.trim()
     if (trimmed.isEmpty()) return Result.failure(IllegalArgumentException("Empty status"))
+    val uid = currentUserId() ?: return Result.failure(IllegalStateException("Not signed in"))
 
     val now = System.currentTimeMillis()
     val item = StatusItem(
       id = UUID.randomUUID().toString(),
-      userId = currentUserId(),
+      userId = uid,
       userName = currentUserName(),
       userImage = currentUserImage(),
       text = trimmed,
@@ -130,15 +141,14 @@ class StatusRepository @Inject constructor() {
   }
 
   suspend fun createImageStatus(imageUri: Uri, caption: String = ""): Result<StatusItem> {
+    val uid = currentUserId() ?: return Result.failure(IllegalStateException("Not signed in"))
     val now = System.currentTimeMillis()
     val id = UUID.randomUUID().toString()
-    val uid = currentUserId()
 
     val mediaUrl = try {
-      uploadImage(uid, id, imageUri)
+      uploadMedia(uid, id, imageUri)
     } catch (e: Exception) {
-      logger.e(e) { "Image upload failed — storing local uri in demo mode" }
-      useDemoFallback = true
+      logger.e(e) { "Image upload failed — using local uri" }
       imageUri.toString()
     }
 
@@ -156,8 +166,34 @@ class StatusRepository @Inject constructor() {
     return persistStatus(item)
   }
 
+  suspend fun createVideoStatus(videoUri: Uri, caption: String = ""): Result<StatusItem> {
+    val uid = currentUserId() ?: return Result.failure(IllegalStateException("Not signed in"))
+    val now = System.currentTimeMillis()
+    val id = UUID.randomUUID().toString()
+
+    val mediaUrl = try {
+      uploadMedia(uid, id, videoUri)
+    } catch (e: Exception) {
+      logger.e(e) { "Video upload failed — using local uri" }
+      videoUri.toString()
+    }
+
+    val item = StatusItem(
+      id = id,
+      userId = uid,
+      userName = currentUserName(),
+      userImage = currentUserImage(),
+      mediaUrl = mediaUrl,
+      text = caption.trim(),
+      type = StatusType.VIDEO,
+      createdAt = now,
+      expiresAt = now + StatusItem.TWENTY_FOUR_HOURS_MS
+    )
+    return persistStatus(item)
+  }
+
   suspend fun markViewed(statusId: String): Result<Unit> {
-    val uid = currentUserId()
+    val uid = currentUserId() ?: return Result.failure(IllegalStateException("Not signed in"))
     if (useDemoFallback) {
       updateDemoViewed(statusId, uid)
       return Result.success(Unit)
@@ -168,15 +204,32 @@ class StatusRepository @Inject constructor() {
       db.collection(COLLECTION).document(statusId)
         .update("viewedBy", FieldValue.arrayUnion(uid))
         .awaitTask()
-      // Patch local state — avoid a full 100-doc refresh on every view.
       patchViewedLocally(statusId, uid)
       Result.success(Unit)
     } catch (e: Exception) {
       logger.e(e) { "markViewed failed" }
-      useDemoFallback = true
-      updateDemoViewed(statusId, uid)
-      Result.success(Unit)
+      Result.failure(e)
     }
+  }
+
+  suspend fun resolveViewerNames(viewerIds: List<String>): Map<String, String> {
+    if (viewerIds.isEmpty()) return emptyMap()
+    val db = firestoreOrNull() ?: return viewerIds.associateWith { it }
+    val names = mutableMapOf<String, String>()
+    viewerIds.distinct().chunked(10).forEach { chunk ->
+      chunk.forEach { viewerId ->
+        runCatching {
+          val snap = db.collection(USERS).document(viewerId).get().awaitTask()
+          val name = snap.getString("name")?.takeIf { it.isNotBlank() }
+            ?: snap.getString("username")?.takeIf { it.isNotBlank() }
+            ?: viewerId
+          names[viewerId] = name
+        }.onFailure {
+          names[viewerId] = viewerId
+        }
+      }
+    }
+    return names
   }
 
   private fun patchViewedLocally(statusId: String, uid: String) {
@@ -206,16 +259,20 @@ class StatusRepository @Inject constructor() {
       refresh()
       Result.success(item)
     } catch (e: Exception) {
-      logger.e(e) { "persistStatus failed — demo fallback" }
-      useDemoFallback = true
-      demoStatuses.add(0, item)
-      ensureDemoStatuses()
-      emitDemoStatuses()
-      Result.success(item)
+      logger.e(e) { "persistStatus failed" }
+      if (ENABLE_DEMO_FALLBACK) {
+        useDemoFallback = true
+        demoStatuses.add(0, item)
+        ensureDemoStatuses()
+        emitDemoStatuses()
+        Result.success(item)
+      } else {
+        Result.failure(e)
+      }
     }
   }
 
-  private suspend fun uploadImage(uid: String, statusId: String, uri: Uri): String {
+  private suspend fun uploadMedia(uid: String, statusId: String, uri: Uri): String {
     val storage = storageOrNull() ?: error("Storage unavailable")
     val path = "statuses/$uid/$statusId"
     val ref = storage.reference.child(path)
@@ -247,19 +304,8 @@ class StatusRepository @Inject constructor() {
         type = StatusType.IMAGE,
         createdAt = now - 7_200_000,
         expiresAt = now + StatusItem.TWENTY_FOUR_HOURS_MS
-      ),
-      StatusItem(
-        id = "demo-contact-3",
-        userId = "contact_alice",
-        userName = "Alice",
-        userImage = "https://i.pravatar.cc/150?u=alice",
-        mediaUrl = "https://picsum.photos/seed/alice/800/1200",
-        type = StatusType.IMAGE,
-        createdAt = now - 1_800_000,
-        expiresAt = now + StatusItem.TWENTY_FOUR_HOURS_MS
       )
     )
-    // Keep any statuses the user already created in this session.
     val mine = demoStatuses.filter { it.userId == currentUserId() }
     demoStatuses.clear()
     demoStatuses.addAll(mine)
@@ -267,7 +313,7 @@ class StatusRepository @Inject constructor() {
   }
 
   private fun emitDemoStatuses() {
-    val uid = currentUserId()
+    val uid = currentUserId().orEmpty()
     _myStatuses.value = demoStatuses.filter { it.userId == uid }
       .sortedByDescending { it.createdAt }
     _contactStatuses.value = demoStatuses.filter { it.userId != uid }
@@ -334,7 +380,10 @@ class StatusRepository @Inject constructor() {
 
   companion object {
     private const val COLLECTION = "statuses"
-    const val DEMO_USER_ID = "demo-user"
+    private const val USERS = "users"
+
+    /** Set to true only for local DEBUG demos; default OFF. */
+    private const val ENABLE_DEMO_FALLBACK = false
   }
 }
 

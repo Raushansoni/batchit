@@ -26,6 +26,10 @@ android {
 }
 
 dependencies {
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.auth)
+  implementation(libs.firebase.firestore)
+
   implementation(libs.androidx.lifecycle.runtimeCompose)
   implementation(libs.androidx.lifecycle.viewModelCompose)
   implementation(libs.landscapist.glide)

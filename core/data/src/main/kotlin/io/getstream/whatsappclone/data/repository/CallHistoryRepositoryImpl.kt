@@ -16,38 +16,31 @@
 
 package io.getstream.whatsappclone.data.repository
 
-import io.getstream.whatsappclone.data.model.toModel
-import io.getstream.whatsappclone.database.dao.WhatsAppUserDao
-import io.getstream.whatsappclone.database.entity.asEntity
+import io.getstream.whatsappclone.model.CallRecord
 import io.getstream.whatsappclone.model.WhatsAppUser
 import io.getstream.whatsappclone.network.Dispatcher
 import io.getstream.whatsappclone.network.WhatsAppDispatchers
-import io.getstream.whatsappclone.network.service.WhatsAppUserService
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 
 internal class CallHistoryRepositoryImpl @Inject constructor(
   @Dispatcher(WhatsAppDispatchers.IO) private val ioDispatcher: CoroutineDispatcher,
-  private val whatsAppUserService: WhatsAppUserService,
-  private val whatsAppUserDao: WhatsAppUserDao
+  private val localCallHistoryStore: LocalCallHistoryStore
 ) : CallHistoryRepository {
 
-  override fun getCallHistoryUsersStream(): Flow<Result<List<WhatsAppUser>>> = flow {
-    val offlineCallHistory = whatsAppUserDao.getWhatsAppUser()
-    if (offlineCallHistory.isEmpty()) {
-      val result = whatsAppUserService.fetchWhatsAppUsers()
-      updateCallCallHistoryUsers(result)
-      emit(result)
-    } else {
-      emit(Result.success(offlineCallHistory.map { it.toModel() }))
-    }
-  }.flowOn(ioDispatcher)
+  override fun getCallHistoryUsersStream(): Flow<Result<List<WhatsAppUser>>> =
+    localCallHistoryStore.records
+      .map { records -> Result.success(records.map { it.toWhatsAppUser() }) }
+      .flowOn(ioDispatcher)
 
   override suspend fun updateCallCallHistoryUsers(whatsappUsers: Result<List<WhatsAppUser>>) {
-    val entities = whatsappUsers.getOrNull()?.map { it.asEntity() } ?: return
-    whatsAppUserDao.insertWhatsAppUsers(entities)
+    // Legacy API kept for DI compatibility; real history uses [recordCall].
+  }
+
+  override fun recordCall(record: CallRecord) {
+    localCallHistoryStore.add(record)
   }
 }

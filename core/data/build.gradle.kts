@@ -17,6 +17,7 @@ plugins {
   id("getstream.android.library")
   id("getstream.android.hilt")
   id("getstream.spotless")
+  id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -27,4 +28,5 @@ dependencies {
   api(project(":core:model"))
   api(project(":core:network"))
   api(project(":core:database"))
+  implementation(libs.kotlinx.serialization.json)
 }

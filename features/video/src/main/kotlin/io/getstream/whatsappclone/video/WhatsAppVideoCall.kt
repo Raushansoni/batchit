@@ -226,15 +226,11 @@ private fun WhatsAppVideoCallContentPreview() {
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun EnsureVideoCallPermissions(onPermissionsGranted: () -> Unit) {
-  // While the SDK will handle the microphone permission,
-  // its not a bad idea to do it prior to entering any call UIs
   val permissionsState = rememberMultiplePermissionsState(
     permissions = buildList {
-      // Access to microphone
       add(Manifest.permission.CAMERA)
       add(Manifest.permission.RECORD_AUDIO)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        // Allow for foreground service for notification on API 26+
         add(Manifest.permission.FOREGROUND_SERVICE)
       }
     }

@@ -259,6 +259,37 @@ class AuthRepository @Inject constructor(
     setLoggedIn(false)
   }
 
+  suspend fun deleteAccount(): Result<Unit> = runCatching {
+    val user = Firebase.auth.currentUser
+    val uid = user?.uid
+
+    if (uid != null) {
+      try {
+        Firebase.firestore.collection(USERS_COLLECTION)
+          .document(uid)
+          .delete()
+          .awaitTask()
+      } catch (error: Throwable) {
+        streamLog { "Firestore user delete skipped: ${error.message}" }
+      }
+    }
+
+    try {
+      user?.delete()?.awaitTask()
+    } catch (error: Throwable) {
+      streamLog { "Firebase user delete failed: ${error.message}" }
+      throw error
+    }
+
+    streamSessionManager.disconnect(chatClient)
+    try {
+      Firebase.auth.signOut()
+    } catch (error: Throwable) {
+      streamLog { "Firebase signOut after delete skipped: ${error.message}" }
+    }
+    setLoggedIn(false)
+  }
+
   private suspend fun upsertAuthUserProfile() {
     val user = Firebase.auth.currentUser ?: return
     try {

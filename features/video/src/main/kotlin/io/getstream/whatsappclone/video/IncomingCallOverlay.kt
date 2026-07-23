@@ -1,0 +1,112 @@
+/*
+ * Copyright 2023 Stream.IO, Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.getstream.whatsappclone.video
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import io.getstream.video.android.compose.theme.VideoTheme
+import io.getstream.video.android.compose.ui.components.call.ringing.RingingCallContent
+import io.getstream.video.android.core.Call
+import io.getstream.video.android.core.StreamVideo
+import io.getstream.whatsappclone.data.repository.CallHistoryRepository
+import io.getstream.whatsappclone.model.CallRecord
+import javax.inject.Inject
+import kotlinx.coroutines.launch
+
+@HiltViewModel
+class IncomingCallViewModel @Inject constructor(
+  private val callHistoryRepository: CallHistoryRepository
+) : ViewModel() {
+
+  fun onCallAccepted(call: Call) {
+    record(call, outgoing = false, missed = false)
+  }
+
+  fun accept(call: Call, onJoined: (Call) -> Unit) {
+    viewModelScope.launch {
+      val result = call.join()
+      result.onSuccess {
+        record(call, outgoing = false, missed = false)
+        onJoined(call)
+      }
+    }
+  }
+
+  fun reject(call: Call) {
+    viewModelScope.launch {
+      runCatching { call.reject() }
+      record(call, outgoing = false, missed = true)
+    }
+  }
+
+  private fun record(call: Call, outgoing: Boolean, missed: Boolean) {
+    val me = runCatching { StreamVideo.instance().user.id }.getOrNull().orEmpty()
+    val peer = call.state.members.value.map { it.user }.firstOrNull { it.id != me }
+    callHistoryRepository.recordCall(
+      CallRecord(
+        callId = call.id,
+        peerId = peer?.id.orEmpty(),
+        peerName = peer?.name.orEmpty(),
+        peerImage = peer?.image.orEmpty(),
+        video = true,
+        outgoing = outgoing,
+        missed = missed
+      )
+    )
+  }
+}
+
+@Composable
+fun IncomingCallOverlay(
+  onCallConnected: (callId: String, video: Boolean) -> Unit,
+  viewModel: IncomingCallViewModel = hiltViewModel()
+) {
+  val streamVideo = remember {
+    runCatching { StreamVideo.instance() }.getOrNull()
+  } ?: return
+
+  val ringingCall by streamVideo.state.ringingCall.collectAsStateWithLifecycle()
+  val call = ringingCall ?: return
+  val scope = rememberCoroutineScope()
+
+  VideoTheme {
+    RingingCallContent(
+      call = call,
+      isVideoType = true,
+      modifier = Modifier.fillMaxSize(),
+      onBackPressed = {
+        scope.launch { viewModel.reject(call) }
+      },
+      onAcceptedContent = {
+        LaunchedEffect(call.id) {
+          viewModel.onCallAccepted(call)
+          onCallConnected(call.id, true)
+        }
+      }
+    )
+  }
+}

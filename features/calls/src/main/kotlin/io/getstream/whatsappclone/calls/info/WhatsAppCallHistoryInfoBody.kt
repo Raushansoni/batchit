@@ -82,12 +82,16 @@ fun WhatsAppCallHistoryInfoBody(
           end.linkTo(parent.end)
         }
         .clickable {
-          whatsAppCallHistoryViewModel.navigateToVideoCall(
-            channelId = whatsAppUser.cell,
-            videoCall = false
+          whatsAppCallHistoryViewModel.redial(
+            whatsAppUser = whatsAppUser,
+            videoCall = whatsAppUser.nationality == "video"
           )
         },
-      imageVector = WhatsAppIcons.Call,
+      imageVector = if (whatsAppUser.nationality == "video") {
+        WhatsAppIcons.Video
+      } else {
+        WhatsAppIcons.Call
+      },
       tint = GREEN450,
       contentDescription = null
     )

@@ -14,33 +14,40 @@
  * limitations under the License.
  */
 
-package io.getstream.whatsappclone.calls.info
+package io.getstream.whatsappclone.chats.starred
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.getstream.whatsappclone.model.WhatsAppUser
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
-import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 @HiltViewModel
-class WhatsAppCallHistoryViewModel @Inject constructor(
+class StarredMessagesViewModel @Inject constructor(
+  private val starredMessagesStore: StarredMessagesStore,
   private val composeNavigator: AppComposeNavigator
 ) : ViewModel() {
 
-  fun navigateUp() {
-    composeNavigator.navigateUp()
+  private val _entries = MutableStateFlow(starredMessagesStore.list())
+  val entries: StateFlow<List<StarredMessage>> = _entries.asStateFlow()
+
+  fun refresh() {
+    _entries.value = starredMessagesStore.list()
   }
 
-  fun redial(whatsAppUser: WhatsAppUser, videoCall: Boolean) {
-    val peerId = whatsAppUser.email.ifBlank { whatsAppUser.phone }
-    composeNavigator.navigate(
-      WhatsAppScreens.VideoCall.createRoute(
-        callId = UUID.randomUUID().toString(),
-        videoCall = videoCall,
-        members = peerId
-      )
-    )
+  fun openChannel(channelId: String) {
+    composeNavigator.navigate(WhatsAppScreens.Messages.createRoute(channelId))
+  }
+
+  fun unstar(entry: StarredMessage) {
+    starredMessagesStore.unstar(entry.messageId, entry.channelId)
+    refresh()
+  }
+
+  fun navigateUp() {
+    composeNavigator.navigateUp()
   }
 }

@@ -17,29 +17,16 @@
 package io.getstream.whatsappclone.settings.ui
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
-import io.getstream.whatsappclone.designsystem.theme.getTitleColor
 import io.getstream.whatsappclone.settings.PrivacySettings
 import io.getstream.whatsappclone.settings.R
 import io.getstream.whatsappclone.settings.SettingsViewModel
@@ -47,13 +34,19 @@ import io.getstream.whatsappclone.settings.SettingsViewModel
 @Composable
 fun PrivacySettingsScreen(
   onBackClick: () -> Unit,
+  onBlockedContactsClick: () -> Unit = {},
   settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
   val privacy by settingsViewModel.privacySettings.collectAsStateWithLifecycle()
 
+  LaunchedEffect(Unit) {
+    settingsViewModel.syncPrivacyFromFirestore()
+  }
+
   PrivacySettingsContent(
     privacy = privacy,
     onBackClick = onBackClick,
+    onBlockedContactsClick = onBlockedContactsClick,
     onLastSeenChange = settingsViewModel::setLastSeenVisible,
     onReadReceiptsChange = settingsViewModel::setReadReceiptsEnabled,
     onProfilePhotoChange = settingsViewModel::setProfilePhotoVisible
@@ -64,30 +57,16 @@ fun PrivacySettingsScreen(
 private fun PrivacySettingsContent(
   privacy: PrivacySettings,
   onBackClick: () -> Unit,
+  onBlockedContactsClick: () -> Unit,
   onLastSeenChange: (Boolean) -> Unit,
   onReadReceiptsChange: (Boolean) -> Unit,
   onProfilePhotoChange: (Boolean) -> Unit
 ) {
   Column(modifier = Modifier.fillMaxSize()) {
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 4.dp, vertical = 8.dp),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      IconButton(onClick = onBackClick) {
-        Icon(
-          imageVector = Icons.Rounded.ArrowBack,
-          contentDescription = null,
-          tint = getTitleColor()
-        )
-      }
-      Text(
-        text = stringResource(id = R.string.settings_privacy_title),
-        style = MaterialTheme.typography.titleLarge,
-        color = getTitleColor()
-      )
-    }
+    SettingsTopBar(
+      title = stringResource(id = R.string.settings_privacy_title),
+      onBackClick = onBackClick
+    )
 
     PrivacyToggleRow(
       title = stringResource(id = R.string.settings_last_seen),
@@ -107,6 +86,12 @@ private fun PrivacySettingsContent(
       checked = privacy.profilePhotoVisible,
       onCheckedChange = onProfilePhotoChange
     )
+
+    SettingsNavigationRow(
+      title = stringResource(id = R.string.settings_blocked_contacts),
+      description = stringResource(id = R.string.settings_blocked_contacts_desc),
+      onClick = onBlockedContactsClick
+    )
   }
 }
 
@@ -117,33 +102,12 @@ private fun PrivacyToggleRow(
   checked: Boolean,
   onCheckedChange: (Boolean) -> Unit
 ) {
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 12.dp),
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    Column(modifier = Modifier.weight(1f)) {
-      Text(
-        text = title,
-        style = MaterialTheme.typography.bodyLarge,
-        color = getTitleColor()
-      )
-      Text(
-        text = description,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onTertiary
-      )
-    }
-    Switch(
-      checked = checked,
-      onCheckedChange = onCheckedChange,
-      colors = SwitchDefaults.colors(
-        checkedThumbColor = MaterialTheme.colorScheme.secondary,
-        checkedTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f)
-      )
-    )
-  }
+  SettingsToggleRow(
+    title = title,
+    description = description,
+    checked = checked,
+    onCheckedChange = onCheckedChange
+  )
 }
 
 @Preview
@@ -153,6 +117,7 @@ private fun PrivacySettingsScreenPreview() {
     PrivacySettingsContent(
       privacy = PrivacySettings(),
       onBackClick = {},
+      onBlockedContactsClick = {},
       onLastSeenChange = {},
       onReadReceiptsChange = {},
       onProfilePhotoChange = {}
