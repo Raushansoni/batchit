@@ -243,8 +243,13 @@ class BatchItNotifier @Inject constructor(
     private const val GROUP_MESSAGES = "batchit_messages_group"
     private const val SUMMARY_ID = 9001
 
-    fun notificationIdForMessage(channelCid: String): Int = 10_000 + (channelCid.hashCode() and 0xffff)
-    fun notificationIdForCall(callId: String): Int = 20_000 + (callId.hashCode() and 0xffff)
-    fun notificationIdForMissedCall(callId: String): Int = 30_000 + (callId.hashCode() and 0xffff)
+    fun notificationIdForMessage(channelCid: String): Int =
+      10_000 + (channelCid.hashCode() and 0xffff)
+
+    fun notificationIdForCall(callId: String): Int =
+      20_000 + (callId.hashCode() and 0xffff)
+
+    fun notificationIdForMissedCall(callId: String): Int =
+      30_000 + (callId.hashCode() and 0xffff)
   }
 }
