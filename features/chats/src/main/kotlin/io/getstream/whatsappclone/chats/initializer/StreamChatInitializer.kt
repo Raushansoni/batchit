@@ -74,6 +74,7 @@ class StreamChatInitializer : Initializer<Unit> {
       NotificationConfig(pushNotificationsEnabled = false)
     }
 
+    // Stream Chat SDK overload has no notificationTextFormatter; preview text uses SDK defaults.
     val notificationHandler = try {
       NotificationHandlerFactory.createNotificationHandler(
         context = context,
@@ -89,16 +90,6 @@ class StreamChatInitializer : Initializer<Unit> {
           ).apply {
             description = "New message alerts"
             enableVibration(true)
-          }
-        },
-        notificationTextFormatter = { _, message ->
-          val showPreview = prefs.getBoolean(KEY_NOTIFICATION_PREVIEW, true)
-          if (!showPreview) {
-            "New message"
-          } else if (message.text.isNotBlank()) {
-            message.text
-          } else {
-            "Attachment"
           }
         }
       )
@@ -138,7 +129,6 @@ class StreamChatInitializer : Initializer<Unit> {
     // Must match SettingsRepository / MainActivity extras.
     private const val PREFS_SETTINGS = "batchit_settings"
     private const val KEY_MSG_NOTIFICATIONS = "notifications_messages"
-    private const val KEY_NOTIFICATION_PREVIEW = "notifications_preview"
     private const val PUSH_CHANNEL_ID = "batchit_messages"
     private const val EXTRA_OPEN_CHANNEL = "batchit_open_channel"
   }
