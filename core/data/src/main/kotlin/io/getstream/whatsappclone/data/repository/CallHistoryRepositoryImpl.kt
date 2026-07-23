@@ -43,4 +43,7 @@ internal class CallHistoryRepositoryImpl @Inject constructor(
   override fun recordCall(record: CallRecord) {
     localCallHistoryStore.add(record)
   }
+
+  override fun observeRecords(): Flow<List<CallRecord>> =
+    localCallHistoryStore.records
 }

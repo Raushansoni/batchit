@@ -20,6 +20,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.getstream.whatsappclone.auth.AuthUiState
 import io.getstream.whatsappclone.auth.AuthViewModel
@@ -39,9 +41,15 @@ import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppNavHost
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
+import io.getstream.whatsappclone.notifications.BatchItNotificationCoordinator
+import io.getstream.whatsappclone.notifications.NotificationDeepLink
+import io.getstream.whatsappclone.notifications.NotificationDeepLinkBus
 import io.getstream.whatsappclone.settings.SettingsViewModel
 import io.getstream.whatsappclone.update.AppUpdateHost
 import io.getstream.whatsappclone.video.IncomingCallOverlay
+import androidx.compose.ui.platform.LocalContext
+import dagger.hilt.android.EntryPointAccessors
+import io.getstream.whatsappclone.notifications.NotificationEntryPoint
 
 @Composable
 fun WhatsAppCloneMain(
@@ -51,6 +59,12 @@ fun WhatsAppCloneMain(
 ) {
   val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
   val darkTheme = themeMode.resolveIsDark(isSystemInDarkTheme())
+  val appContext = LocalContext.current.applicationContext
+  val notificationEntry = remember(appContext) {
+    EntryPointAccessors.fromApplication(appContext, NotificationEntryPoint::class.java)
+  }
+  val notificationCoordinator = remember(notificationEntry) { notificationEntry.notificationCoordinator() }
+  val deepLinkBus = remember(notificationEntry) { notificationEntry.deepLinkBus() }
 
   WhatsAppCloneComposeTheme(darkTheme = darkTheme) {
     SyncSystemBars(darkTheme = darkTheme)
@@ -67,6 +81,15 @@ fun WhatsAppCloneMain(
       }
     }
 
+    DisposableEffect(sessionReady) {
+      if (sessionReady) {
+        notificationCoordinator.start()
+      } else {
+        notificationCoordinator.stop()
+      }
+      onDispose { notificationCoordinator.stop() }
+    }
+
     WhatsAppCloneBackground {
       when {
         authState is AuthUiState.Loading && !sessionReady -> {
@@ -80,6 +103,39 @@ fun WhatsAppCloneMain(
           LaunchedEffect(navHostController) {
             composeNavigator.handleNavigationCommands(navHostController)
           }
+
+          val backStackEntry by navHostController.currentBackStackEntryAsState()
+          LaunchedEffect(backStackEntry) {
+            val route = backStackEntry?.destination?.route.orEmpty()
+            val channelId = backStackEntry?.arguments?.getString("channelId")
+            val activeCid = when {
+              route.startsWith("messages") && !channelId.isNullOrBlank() -> channelId
+              else -> null
+            }
+            notificationCoordinator.setActiveChannelCid(activeCid)
+          }
+
+          LaunchedEffect(deepLinkBus, sessionReady) {
+            deepLinkBus.events.collect { link ->
+              when (link) {
+                is NotificationDeepLink.OpenChat -> {
+                  composeNavigator.navigate(WhatsAppScreens.Messages.createRoute(link.channelCid))
+                }
+                is NotificationDeepLink.OpenVideoCall -> {
+                  composeNavigator.navigate(
+                    WhatsAppScreens.VideoCall.createRoute(
+                      callId = link.callId,
+                      videoCall = link.video
+                    )
+                  )
+                }
+                NotificationDeepLink.OpenCallsTab -> {
+                  composeNavigator.navigate(WhatsAppScreens.Home.name)
+                }
+              }
+            }
+          }
+
           Box(modifier = Modifier.fillMaxSize()) {
             WhatsAppNavHost(
               navHostController = navHostController,

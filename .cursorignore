@@ -9,6 +9,7 @@ gen/
 out/
 captures/
 .navigation/
+proguard/
 
 # Packaged Android artifacts
 *.apk
@@ -17,6 +18,7 @@ captures/
 *.aar
 *.dex
 *.class
+*.hprof
 
 # IDE / editor
 .idea/
@@ -36,9 +38,12 @@ service-account*.json
 *-firebase-adminsdk*.json
 functions/.env
 functions/.runtimeconfig.json
+workers/**/.dev.vars
+workers/**/.wrangler/
 
-# Dependencies & Firebase local
+# Dependencies & Firebase / Workers local
 functions/node_modules/
+workers/**/node_modules/
 .firebase/
 *.log
 

@@ -105,6 +105,8 @@ class SettingsRepository @Inject constructor(
     syncPrivacyToFirestore(_privacySettings.value)
   }
 
+  fun currentNotificationSettings(): NotificationSettings = _notificationSettings.value
+
   fun setMessageNotifications(enabled: Boolean) {
     prefs.edit().putBoolean(KEY_MSG_NOTIFICATIONS, enabled).apply()
     _notificationSettings.update { it.copy(messageNotifications = enabled) }
@@ -274,7 +276,7 @@ class SettingsRepository @Inject constructor(
     ThemeMode.fromStorage(prefs.getString(KEY_THEME_MODE, null))
 
   companion object {
-    private const val PREFS_NAME = "batchit_settings"
+    const val PREFS_NAME = "batchit_settings"
     private const val USERS = "users"
     private const val PRIVACY_LAST_SEEN = "lastSeenVisible"
     private const val PRIVACY_READ_RECEIPTS = "readReceiptsEnabled"
@@ -282,9 +284,9 @@ class SettingsRepository @Inject constructor(
     private const val KEY_LAST_SEEN = "privacy_last_seen"
     private const val KEY_READ_RECEIPTS = "privacy_read_receipts"
     private const val KEY_PROFILE_PHOTO = "privacy_profile_photo"
-    private const val KEY_MSG_NOTIFICATIONS = "notifications_messages"
-    private const val KEY_CALL_NOTIFICATIONS = "notifications_calls"
-    private const val KEY_NOTIFICATION_PREVIEW = "notifications_preview"
+    const val KEY_MSG_NOTIFICATIONS = "notifications_messages"
+    const val KEY_CALL_NOTIFICATIONS = "notifications_calls"
+    const val KEY_NOTIFICATION_PREVIEW = "notifications_preview"
     private const val KEY_AUTO_DOWNLOAD_WIFI = "storage_auto_wifi"
     private const val KEY_AUTO_DOWNLOAD_CELLULAR = "storage_auto_cellular"
     private const val KEY_MEDIA_QUALITY_HIGH = "storage_media_quality_high"

@@ -32,4 +32,20 @@
   <string name="update_downloading_title">Downloading update</string>
   <string name="update_downloading_message">Downloading BatchIt %1$s. You will be prompted to install when it finishes.</string>
   <string name="update_error_title">Update failed</string>
+
+  <string name="notification_channel_messages">Messages</string>
+  <string name="notification_channel_messages_desc">New chat message alerts</string>
+  <string name="notification_channel_calls">Calls</string>
+  <string name="notification_channel_calls_desc">Incoming and missed call alerts</string>
+  <string name="notification_new_message">New message</string>
+  <string name="notification_new_messages">New messages</string>
+  <string name="notification_message_attachment">Attachment</string>
+  <string name="notification_incoming_call">Incoming call</string>
+  <string name="notification_incoming_video_call">Incoming video call</string>
+  <string name="notification_incoming_voice_call">Incoming voice call</string>
+  <string name="notification_missed_call">Missed call</string>
+  <string name="notification_missed_video_call">Missed video call</string>
+  <string name="notification_missed_voice_call">Missed voice call</string>
+  <string name="notification_call_accept">Accept</string>
+  <string name="notification_call_decline">Decline</string>
 </resources>

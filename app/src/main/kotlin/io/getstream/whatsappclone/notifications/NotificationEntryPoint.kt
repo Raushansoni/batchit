@@ -14,19 +14,15 @@
  * limitations under the License.
  */
 
-package io.getstream.whatsappclone.data.repository
+package io.getstream.whatsappclone.notifications
 
-import io.getstream.whatsappclone.model.CallRecord
-import io.getstream.whatsappclone.model.WhatsAppUser
-import kotlinx.coroutines.flow.Flow
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 
-interface CallHistoryRepository {
-
-  fun getCallHistoryUsersStream(): Flow<Result<List<WhatsAppUser>>>
-
-  suspend fun updateCallCallHistoryUsers(whatsappUsers: Result<List<WhatsAppUser>>)
-
-  fun recordCall(record: CallRecord)
-
-  fun observeRecords(): Flow<List<CallRecord>>
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface NotificationEntryPoint {
+  fun notificationCoordinator(): BatchItNotificationCoordinator
+  fun deepLinkBus(): NotificationDeepLinkBus
 }
