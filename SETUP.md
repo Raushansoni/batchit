@@ -67,6 +67,27 @@ Paste the printed Worker URL into `STREAM_TOKEN_URL` in `secrets.properties` (no
 
 ---
 
+## In-app updates (free, GitHub-driven)
+
+On every push to `main`, [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml):
+
+1. Builds a debug APK
+2. Publishes a GitHub Release (`v{versionName}+{versionCode}`) with the APK + `app_update.json`
+3. Optionally writes Firestore `config/app_update` when secret `FIREBASE_SERVICE_ACCOUNT` is set
+
+The app checks Firestore first, then falls back to GitHub Releases API. If `versionCode` is newer than the installed build, it shows an **Update** dialog, downloads the APK, and opens the system installer.
+
+### One-time setup
+
+1. Bump `versionCode` / `patchVersion` in `buildSrc/src/main/kotlin/Configurations.kt` before shipping.
+2. Deploy Firestore rules from `firestore.rules` (Console or `firebase deploy --only firestore:rules`).
+3. (Recommended) Add GitHub repo secret `FIREBASE_SERVICE_ACCOUNT` = JSON for a Firebase Admin service account with Firestore write access.
+4. Users must allow **Install unknown apps** for BatchIt (sideload installs).
+
+Without the Firebase secret, updates still work via public GitHub Release assets.
+
+---
+
 ## What this does not include (needs Blaze / paid)
 
 | Feature | Why |

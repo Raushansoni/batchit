@@ -1,0 +1,125 @@
+name: Release APK
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Read version from Configurations.kt
+        id: ver
+        run: |
+          FILE=buildSrc/src/main/kotlin/Configurations.kt
+          CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' "$FILE")
+          MAJOR=$(grep -oP 'majorVersion\s*=\s*\K[0-9]+' "$FILE")
+          MINOR=$(grep -oP 'minorVersion\s*=\s*\K[0-9]+' "$FILE")
+          PATCH=$(grep -oP 'patchVersion\s*=\s*\K[0-9]+' "$FILE")
+          NAME="${MAJOR}.${MINOR}.${PATCH}"
+          echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Resolved version $NAME ($CODE)"
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Prepare release artifacts
+        id: artifacts
+        run: |
+          mkdir -p dist
+          SRC=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
+          DEST="dist/batchit-${{ steps.ver.outputs.version_name }}-${{ steps.ver.outputs.version_code }}.apk"
+          cp "$SRC" "$DEST"
+          TAG="v${{ steps.ver.outputs.version_name }}+${{ steps.ver.outputs.version_code }}"
+          ASSET="$(basename "$DEST")"
+          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET}"
+          cat > dist/app_update.json <<EOF
+          {
+            "versionCode": ${{ steps.ver.outputs.version_code }},
+            "versionName": "${{ steps.ver.outputs.version_name }}",
+            "apkUrl": "${URL}",
+            "forceUpdate": false,
+            "notes": "BatchIt ${{ steps.ver.outputs.version_name }}"
+          }
+          EOF
+          echo "apk_path=$DEST" >> "$GITHUB_OUTPUT"
+          echo "apk_url=$URL" >> "$GITHUB_OUTPUT"
+          cat dist/app_update.json
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version_name }}+${{ steps.ver.outputs.version_code }}
+          name: BatchIt ${{ steps.ver.outputs.version_name }} (${{ steps.ver.outputs.version_code }})
+          body: |
+            Automatic build from `main`.
+
+            - versionName: ${{ steps.ver.outputs.version_name }}
+            - versionCode: ${{ steps.ver.outputs.version_code }}
+          files: |
+            ${{ steps.artifacts.outputs.apk_path }}
+            dist/app_update.json
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write Firestore config/app_update
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VERSION_CODE: ${{ steps.ver.outputs.version_code }}
+          VERSION_NAME: ${{ steps.ver.outputs.version_name }}
+          APK_URL: ${{ steps.artifacts.outputs.apk_url }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Skipping Firestore write — add repo secret FIREBASE_SERVICE_ACCOUNT to enable."
+            exit 0
+          fi
+          npm install --silent firebase-admin@12
+          node <<'NODE'
+          const admin = require('firebase-admin');
+          const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          admin.initializeApp({ credential: admin.credential.cert(sa) });
+          const payload = {
+            versionCode: Number(process.env.VERSION_CODE),
+            versionName: process.env.VERSION_NAME,
+            apkUrl: process.env.APK_URL,
+            forceUpdate: false,
+            notes: `BatchIt ${process.env.VERSION_NAME}`,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          };
+          admin.firestore().doc('config/app_update').set(payload, { merge: true })
+            .then(() => {
+              console.log('Wrote config/app_update', payload);
+              process.exit(0);
+            })
+            .catch((err) => {
+              console.error(err);
+              process.exit(1);
+            });
+          NODE

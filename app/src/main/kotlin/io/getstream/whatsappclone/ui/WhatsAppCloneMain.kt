@@ -40,6 +40,7 @@ import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppNavHost
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
 import io.getstream.whatsappclone.settings.SettingsViewModel
+import io.getstream.whatsappclone.update.AppUpdateHost
 import io.getstream.whatsappclone.video.IncomingCallOverlay
 
 @Composable
@@ -94,6 +95,7 @@ fun WhatsAppCloneMain(
                 )
               }
             )
+            AppUpdateHost(enabled = true)
           }
         }
 

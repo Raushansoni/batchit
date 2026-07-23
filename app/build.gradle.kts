@@ -101,4 +101,5 @@ dependencies {
   implementation(libs.firebase.crashlytics)
   implementation(libs.firebase.analytics)
   implementation(libs.firebase.messaging)
+  implementation(libs.firebase.firestore)
 }
