@@ -103,8 +103,9 @@ class BatchItNotificationCoordinator @Inject constructor(
   private fun subscribeMessages() {
     messageDisposable?.dispose()
     messageDisposable = chatClient.subscribeFor(NewMessageEvent::class.java) { event ->
+      val newMessageEvent = event as? NewMessageEvent ?: return@subscribeFor
       scope.launch {
-        handleNewMessage(event)
+        handleNewMessage(newMessageEvent)
       }
     }
   }

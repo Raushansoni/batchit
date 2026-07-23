@@ -71,7 +71,7 @@ class CallActionReceiver : BroadcastReceiver() {
     )
   }
 
-  private fun handleDecline(context: Context, callId: String) {
+  private suspend fun handleDecline(context: Context, callId: String) {
     val call = runCatching {
       StreamVideo.instance().state.ringingCall.value
         ?: StreamVideo.instance().call(type = "default", id = callId)
