@@ -18,12 +18,14 @@ package io.getstream.whatsappclone.auth
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.getstream.android.push.firebase.FirebasePushDeviceGenerator
 import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.client.token.TokenProvider
 import io.getstream.chat.android.models.User
 import io.getstream.log.streamLog
 import io.getstream.video.android.core.StreamVideo
 import io.getstream.video.android.core.StreamVideoBuilder
+import io.getstream.video.android.core.notifications.NotificationConfig
 import io.getstream.video.android.model.User as VideoUser
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -133,6 +135,16 @@ class StreamSessionManager @Inject constructor(
         // Video client may not be installed yet.
       }
 
+      // Same provider name as Chat (`firebase`) so one Stream Dashboard FCM config covers both.
+      val notificationConfig = NotificationConfig(
+        pushDeviceGenerators = listOf(
+          FirebasePushDeviceGenerator(providerName = PUSH_PROVIDER_NAME)
+        ),
+        // In-app IncomingCallOverlay handles ringing while foregrounded.
+        hideRingingNotificationInForeground = true,
+        requestPermissionOnAppLaunch = { false }
+      )
+
       StreamVideoBuilder(
         context = context,
         apiKey = BuildConfig.STREAM_API_KEY,
@@ -142,10 +154,12 @@ class StreamSessionManager @Inject constructor(
           name = name,
           image = image,
           role = "user"
-        )
+        ),
+        notificationConfig = notificationConfig
       ).build()
       streamLog { "StreamVideo connected for $userId" }
     } catch (error: Throwable) {
+      // Keep chat usable; calls will fail until the next successful reconnect.
       streamLog { "StreamVideo connect failed: ${error.message}" }
     }
   }
@@ -154,5 +168,6 @@ class StreamSessionManager @Inject constructor(
     private const val DEMO_USER_ID = "batchit_demo"
     private const val DEMO_USER_NAME = "BatchIt User"
     private const val DEMO_USER_IMAGE = "https://placekitten.com/200/300"
+    private const val PUSH_PROVIDER_NAME = "firebase"
   }
 }

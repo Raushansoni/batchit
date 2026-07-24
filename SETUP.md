@@ -65,6 +65,19 @@ Paste the printed Worker URL into `STREAM_TOKEN_URL` in `secrets.properties` (no
 
 `BatchItAuthConfig.USE_DEMO_AUTH` is `false`. For offline Stream-only testing, set it back to `true` temporarily.
 
+### 5. Push notifications (messages + incoming calls)
+
+Background chat and ringing-call alerts need FCM wired in Stream:
+
+1. Firebase Console → Project settings → **Service accounts** → Generate new private key (JSON).
+2. Stream Dashboard → your app → **Push Notifications** → New Configuration → **Firebase**.
+3. Set **Name** exactly to `firebase` (must match the app’s `providerName`).
+4. Upload the Firebase credentials JSON, enable the provider, save.
+5. On the phone: grant **Notifications** during BatchIt onboarding (or system settings).
+6. Sign out and back in once so Chat + Video re-register the FCM device token.
+
+Without step 2–4, in-app alerts may work while the process is alive, but **killed/background** message and call notifications will not.
+
 ---
 
 ## In-app updates (free, GitHub-driven)

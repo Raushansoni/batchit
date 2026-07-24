@@ -47,6 +47,9 @@ dependencies {
 
   implementation(libs.stream.chat.client)
   implementation(libs.stream.video.core)
+  implementation(libs.stream.chat.push.firebase)
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.messaging)
 
   implementation(libs.okhttp.logging)
   implementation(libs.okhttp)

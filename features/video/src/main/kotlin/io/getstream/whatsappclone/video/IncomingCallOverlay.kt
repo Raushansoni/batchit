@@ -17,15 +17,17 @@
 package io.getstream.whatsappclone.video
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.video.android.compose.theme.VideoTheme
@@ -35,6 +37,7 @@ import io.getstream.video.android.core.StreamVideo
 import io.getstream.whatsappclone.data.repository.CallHistoryRepository
 import io.getstream.whatsappclone.model.CallRecord
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -42,28 +45,28 @@ class IncomingCallViewModel @Inject constructor(
   private val callHistoryRepository: CallHistoryRepository
 ) : ViewModel() {
 
-  fun onCallAccepted(call: Call) {
-    record(call, outgoing = false, missed = false)
+  fun onCallAccepted(call: Call, isVideo: Boolean) {
+    record(call, outgoing = false, missed = false, isVideo = isVideo)
   }
 
-  fun accept(call: Call, onJoined: (Call) -> Unit) {
+  fun accept(call: Call, isVideo: Boolean, onJoined: (Call) -> Unit) {
     viewModelScope.launch {
       val result = call.join()
       result.onSuccess {
-        record(call, outgoing = false, missed = false)
+        record(call, outgoing = false, missed = false, isVideo = isVideo)
         onJoined(call)
       }
     }
   }
 
-  fun reject(call: Call) {
+  fun reject(call: Call, isVideo: Boolean = true) {
     viewModelScope.launch {
       runCatching { call.reject() }
-      record(call, outgoing = false, missed = true)
+      record(call, outgoing = false, missed = true, isVideo = isVideo)
     }
   }
 
-  private fun record(call: Call, outgoing: Boolean, missed: Boolean) {
+  private fun record(call: Call, outgoing: Boolean, missed: Boolean, isVideo: Boolean) {
     val me = runCatching { StreamVideo.instance().user.id }.getOrNull().orEmpty()
     val peer = call.state.members.value.map { it.user }.firstOrNull { it.id != me }
     callHistoryRepository.recordCall(
@@ -72,7 +75,7 @@ class IncomingCallViewModel @Inject constructor(
         peerId = peer?.id.orEmpty(),
         peerName = peer?.name.orEmpty(),
         peerImage = peer?.image.orEmpty(),
-        video = true,
+        video = isVideo,
         outgoing = outgoing,
         missed = missed
       )
@@ -85,26 +88,36 @@ fun IncomingCallOverlay(
   onCallConnected: (callId: String, video: Boolean) -> Unit,
   viewModel: IncomingCallViewModel = hiltViewModel()
 ) {
-  val streamVideo = remember {
-    runCatching { StreamVideo.instance() }.getOrNull()
-  } ?: return
+  var streamVideo by remember {
+    mutableStateOf(runCatching { StreamVideo.instance() }.getOrNull())
+  }
 
-  val ringingCall by streamVideo.state.ringingCall.collectAsStateWithLifecycle()
+  // Video connects after auth; keep retrying so late init still shows ringing UI.
+  LaunchedEffect(Unit) {
+    while (streamVideo == null) {
+      delay(750)
+      streamVideo = runCatching { StreamVideo.instance() }.getOrNull()
+    }
+  }
+
+  val videoClient = streamVideo ?: return
+  val ringingCall by videoClient.state.ringingCall.collectAsStateWithLifecycle()
   val call = ringingCall ?: return
   val scope = rememberCoroutineScope()
+  val isVideo = call.state.settings.value?.video?.enabled != false
 
   VideoTheme {
     RingingCallContent(
       call = call,
-      isVideoType = true,
+      isVideoType = isVideo,
       modifier = Modifier.fillMaxSize(),
       onBackPressed = {
-        scope.launch { viewModel.reject(call) }
+        scope.launch { viewModel.reject(call, isVideo) }
       },
       onAcceptedContent = {
         LaunchedEffect(call.id) {
-          viewModel.onCallAccepted(call)
-          onCallConnected(call.id, true)
+          viewModel.onCallAccepted(call, isVideo)
+          onCallConnected(call.id, isVideo)
         }
       }
     )

@@ -17,7 +17,6 @@
 package io.getstream.whatsappclone.video
 
 import android.Manifest
-import android.os.Build
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -65,7 +64,7 @@ fun WhatsAppVideoCall(
 ) {
   val uiState by viewModel.videoUiSate.collectAsStateWithLifecycle()
 
-  EnsureVideoCallPermissions {
+  EnsureVideoCallPermissions(requireCamera = videoCall) {
     viewModel.joinCall(type = "default", id = id.replace(":", ""))
   }
 
@@ -225,14 +224,16 @@ private fun WhatsAppVideoCallContentPreview() {
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun EnsureVideoCallPermissions(onPermissionsGranted: () -> Unit) {
+fun EnsureVideoCallPermissions(
+  requireCamera: Boolean = true,
+  onPermissionsGranted: () -> Unit
+) {
   val permissionsState = rememberMultiplePermissionsState(
     permissions = buildList {
-      add(Manifest.permission.CAMERA)
-      add(Manifest.permission.RECORD_AUDIO)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        add(Manifest.permission.FOREGROUND_SERVICE)
+      if (requireCamera) {
+        add(Manifest.permission.CAMERA)
       }
+      add(Manifest.permission.RECORD_AUDIO)
     }
   )
 

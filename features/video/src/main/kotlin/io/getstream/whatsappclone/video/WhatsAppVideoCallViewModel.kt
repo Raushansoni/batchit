@@ -55,14 +55,22 @@ class WhatsAppVideoCallViewModel @Inject constructor(
 
   fun joinCall(type: String, id: String) {
     viewModelScope.launch {
-      val streamVideo = StreamVideo.instance()
+      val streamVideo = runCatching { StreamVideo.instance() }.getOrNull()
+      if (streamVideo == null) {
+        videoMutableUiState.value = WhatsAppVideoUiState.Error
+        return@launch
+      }
+
       val activeCall = streamVideo.state.activeCall.value
       val call = if (activeCall != null) {
         if (activeCall.id != id) {
           activeCall.leave()
           streamVideo.call(type = type, id = id)
         } else {
-          activeCall
+          // Already joined (e.g. accept from ringing overlay / notification).
+          recordHistory(activeCall, outgoing = memberIds.isNotEmpty())
+          videoMutableUiState.value = WhatsAppVideoUiState.Success(activeCall)
+          return@launch
         }
       } else {
         streamVideo.call(type = type, id = id)
@@ -78,7 +86,8 @@ class WhatsAppVideoCallViewModel @Inject constructor(
         }
       }
 
-      val result = call.join(create = memberIds.isEmpty())
+      // Incoming / rejoin must not create a new call — that breaks accept flows.
+      val result = call.join(create = false)
 
       result.onSuccess {
         recordHistory(call, outgoing = memberIds.isNotEmpty())

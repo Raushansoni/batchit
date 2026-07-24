@@ -2,7 +2,7 @@
 
 Living changelog of what BatchIt has shipped beyond the upstream GetStream WhatsApp clone. Update this file when a meaningful feature or milestone lands.
 
-**Current release:** `1.1.5` (versionCode `11`) — July 2026  
+**Current release:** `1.1.6` (versionCode `12`) — July 2026  
 **Firebase:** `batchit-prod` · **Package:** `com.batchit.app`
 
 ---
@@ -71,6 +71,8 @@ Living changelog of what BatchIt has shipped beyond the upstream GetStream Whats
 
 | Version | Code | Highlights |
 |---------|------|------------|
+| 1.1.6 | 12 | Video FCM push wiring + call join/permission fixes |
+| 1.1.5 | 11 | Signed release publish bump |
 | 1.1.4 | 10 | Settings “Check for updates” |
 | 1.1.3 | 9 | Call/message notifications + deep links |
 | 1.1.2 | 8 | Bump so installed clients can detect an available update |
