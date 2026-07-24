@@ -69,9 +69,9 @@ Paste the printed Worker URL into `STREAM_TOKEN_URL` in `secrets.properties` (no
 
 ## In-app updates (free, GitHub-driven)
 
-On every push to `main`, [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml):
+When `Configurations.kt` changes on `main` (or when manually dispatched), [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml):
 
-1. Builds a debug APK
+1. Builds a signed, minified release APK
 2. Publishes a GitHub Release (`v{versionName}+{versionCode}`) with the APK + `app_update.json`
 3. Optionally writes Firestore `config/app_update` when secret `FIREBASE_SERVICE_ACCOUNT` is set
 
@@ -79,10 +79,17 @@ The app checks Firestore first, then falls back to GitHub Releases API. If `vers
 
 ### One-time setup
 
-1. Bump `versionCode` / `patchVersion` in `buildSrc/src/main/kotlin/Configurations.kt` before shipping.
-2. Deploy Firestore rules from `firestore.rules` (Console or `firebase deploy --only firestore:rules`).
-3. (Recommended) Add GitHub repo secret `FIREBASE_SERVICE_ACCOUNT` = JSON for a Firebase Admin service account with Firestore write access.
-4. Users must allow **Install unknown apps** for BatchIt (sideload installs).
+1. Create and protect one permanent Android release keystore. Never replace it after users install a release: Android updates require the same signing certificate.
+2. Add these GitHub repository secrets:
+   - `ANDROID_KEYSTORE_BASE64`: `base64 -w 0 release.keystore` (macOS: `base64 -i release.keystore | tr -d '\n'`)
+   - `ANDROID_KEYSTORE_PASSWORD`
+   - `ANDROID_KEY_ALIAS`
+   - `ANDROID_KEY_PASSWORD`
+3. Register the release keystore's SHA-1/SHA-256 in the Firebase Android app so Google Sign-In works in release builds.
+4. Bump `versionCode` / `patchVersion` in `buildSrc/src/main/kotlin/Configurations.kt` before every shipping push. The workflow rejects a duplicate release tag before it spends time building.
+5. Deploy Firestore rules from `firestore.rules` (Console or `firebase deploy --only firestore:rules`).
+6. (Recommended) Add GitHub repo secret `FIREBASE_SERVICE_ACCOUNT` = JSON for a Firebase Admin service account with Firestore write access.
+7. Users must allow **Install unknown apps** for BatchIt (sideload installs). The app opens the relevant Android setting and keeps the downloaded update ready to install after permission is granted.
 
 Without the Firebase secret, updates still work via public GitHub Release assets.
 

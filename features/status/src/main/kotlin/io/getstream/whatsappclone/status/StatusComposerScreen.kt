@@ -64,6 +64,7 @@ import io.getstream.whatsappclone.designsystem.theme.GREEN500
 @Composable
 fun StatusComposerScreen(
   isSaving: Boolean,
+  errorMessage: String?,
   onClose: () -> Unit,
   onPostText: (String) -> Unit,
   onPostImage: (Uri, String) -> Unit,
@@ -239,6 +240,17 @@ fun StatusComposerScreen(
             )
           }
         }
+      }
+
+      if (!errorMessage.isNullOrBlank()) {
+        Text(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+          text = errorMessage,
+          color = MaterialTheme.colorScheme.error,
+          style = MaterialTheme.typography.bodyMedium
+        )
       }
     }
   }

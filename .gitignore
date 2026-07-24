@@ -29,6 +29,8 @@ secrets.properties
 *.keystore
 *.jks
 *.p12
+*.keystoke
+relase.keystoke
 google-services.json
 **/google-services.json
 service-account*.json

@@ -54,6 +54,8 @@ class StatusViewModel @Inject constructor(
   private val _viewerInfo = MutableStateFlow(StatusViewerInfo())
   val viewerInfo: StateFlow<StatusViewerInfo> = _viewerInfo
   private var hasLoadedOnce = false
+  private var isRefreshing = false
+  private var lastRefreshAtMillis = 0L
 
   val uiState: StateFlow<StatusUiState> = combine(
     statusRepository.myStatuses,
@@ -80,18 +82,25 @@ class StatusViewModel @Inject constructor(
   )
 
   fun onTabActive() {
-    if (!hasLoadedOnce || uiState.value.myStatuses.isEmpty() && uiState.value.contactStatuses.isEmpty()) {
+    if (!hasLoadedOnce || System.currentTimeMillis() - lastRefreshAtMillis >= STATUS_REFRESH_INTERVAL_MS) {
       refresh()
     }
   }
 
   fun refresh() {
+    if (isRefreshing) return
     viewModelScope.launch {
-      _isLoading.value = !hasLoadedOnce
-      statusRepository.refresh()
-        .onFailure { _errorMessage.value = it.message ?: "Could not load statuses" }
-      hasLoadedOnce = true
-      _isLoading.value = false
+      isRefreshing = true
+      try {
+        _isLoading.value = !hasLoadedOnce
+        statusRepository.refresh()
+          .onFailure { _errorMessage.value = it.message ?: "Could not load statuses" }
+        hasLoadedOnce = true
+        lastRefreshAtMillis = System.currentTimeMillis()
+      } finally {
+        _isLoading.value = false
+        isRefreshing = false
+      }
     }
   }
 
@@ -100,9 +109,9 @@ class StatusViewModel @Inject constructor(
       _isSaving.value = true
       _errorMessage.value = null
       statusRepository.createTextStatus(text)
+        .onSuccess { onDone() }
         .onFailure { _errorMessage.value = it.message }
       _isSaving.value = false
-      onDone()
     }
   }
 
@@ -111,9 +120,9 @@ class StatusViewModel @Inject constructor(
       _isSaving.value = true
       _errorMessage.value = null
       statusRepository.createImageStatus(uri, caption)
+        .onSuccess { onDone() }
         .onFailure { _errorMessage.value = it.message }
       _isSaving.value = false
-      onDone()
     }
   }
 
@@ -122,9 +131,9 @@ class StatusViewModel @Inject constructor(
       _isSaving.value = true
       _errorMessage.value = null
       statusRepository.createVideoStatus(uri, caption)
+        .onSuccess { onDone() }
         .onFailure { _errorMessage.value = it.message }
       _isSaving.value = false
-      onDone()
     }
   }
 
@@ -160,5 +169,9 @@ class StatusViewModel @Inject constructor(
 
   fun clearError() {
     _errorMessage.value = null
+  }
+
+  private companion object {
+    const val STATUS_REFRESH_INTERVAL_MS = 30_000L
   }
 }

@@ -51,6 +51,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -75,7 +76,10 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.Executor
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.launch
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 private const val PHOTO_SAVED_MESSAGE = "Photo saved — share from chat or Status"
 
@@ -135,9 +139,14 @@ private fun CameraPreviewContent(
   val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
 
   LaunchedEffect(isActive, lensFacing) {
-    if (!isActive) return@LaunchedEffect
+    val cameraProvider = context.awaitCameraProvider(mainExecutor)
+    if (!isActive) {
+      // A CameraX preview continues consuming camera/CPU resources until it is unbound.
+      cameraProvider.unbindAll()
+      imageCapture = null
+      return@LaunchedEffect
+    }
 
-    val cameraProvider = ProcessCameraProvider.getInstance(context).get()
     val preview = Preview.Builder().build().also {
       it.surfaceProvider = previewView.surfaceProvider
     }
@@ -160,6 +169,23 @@ private fun CameraPreviewContent(
     } catch (error: Exception) {
       streamLog { "Camera bind failed: ${error.message}" }
       imageCapture = null
+    }
+  }
+
+  DisposableEffect(context, mainExecutor) {
+    onDispose {
+      // HorizontalPager disposes inactive pages; release the camera immediately instead of
+      // waiting for the activity lifecycle to stop.
+      val providerFuture = ProcessCameraProvider.getInstance(context)
+      providerFuture.addListener(
+        {
+          runCatching { providerFuture.get().unbindAll() }
+            .onFailure { error ->
+              streamLog { "Camera release failed: ${error.message}" }
+            }
+        },
+        mainExecutor
+      )
     }
   }
 
@@ -216,6 +242,25 @@ private fun CameraPreviewContent(
     }
   }
 }
+
+/**
+ * CameraX returns a future even when its provider has not finished initializing. Waiting with
+ * Future.get() from a Compose effect blocks the main thread and causes a visible tab-switch jank.
+ */
+private suspend fun Context.awaitCameraProvider(executor: Executor): ProcessCameraProvider =
+  suspendCancellableCoroutine { continuation ->
+    val providerFuture = ProcessCameraProvider.getInstance(this)
+    providerFuture.addListener(
+      {
+        if (continuation.isActive) {
+          runCatching { providerFuture.get() }
+            .onSuccess { provider -> continuation.resume(provider) }
+            .onFailure { error -> continuation.resumeWithException(error) }
+        }
+      },
+      executor
+    )
+  }
 
 @Composable
 private fun CameraPermissionPlaceholder() {

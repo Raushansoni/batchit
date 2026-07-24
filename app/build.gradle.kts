@@ -24,6 +24,25 @@ plugins {
   alias(libs.plugins.firebase.crashlytics)
 }
 
+val releaseStoreFile = providers.gradleProperty("SIGNING_STORE_FILE")
+  .orElse(providers.environmentVariable("SIGNING_STORE_FILE"))
+  .orNull
+val releaseStorePassword = providers.gradleProperty("SIGNING_STORE_PASSWORD")
+  .orElse(providers.environmentVariable("SIGNING_STORE_PASSWORD"))
+  .orNull
+val releaseKeyAlias = providers.gradleProperty("SIGNING_KEY_ALIAS")
+  .orElse(providers.environmentVariable("SIGNING_KEY_ALIAS"))
+  .orNull
+val releaseKeyPassword = providers.gradleProperty("SIGNING_KEY_PASSWORD")
+  .orElse(providers.environmentVariable("SIGNING_KEY_PASSWORD"))
+  .orNull
+val hasReleaseSigning = listOf(
+  releaseStoreFile,
+  releaseStorePassword,
+  releaseKeyAlias,
+  releaseKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
   namespace = "io.getstream.whatsappclone"
 
@@ -41,8 +60,22 @@ android {
     }
   }
 
+  signingConfigs {
+    if (hasReleaseSigning) {
+      create("release") {
+        storeFile = file(requireNotNull(releaseStoreFile))
+        storePassword = requireNotNull(releaseStorePassword)
+        keyAlias = requireNotNull(releaseKeyAlias)
+        keyPassword = requireNotNull(releaseKeyPassword)
+      }
+    }
+  }
+
   buildTypes {
     release {
+      if (hasReleaseSigning) {
+        signingConfig = signingConfigs.getByName("release")
+      }
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(

@@ -116,6 +116,7 @@ fun WhatsAppStatus(
         StatusOverlay.Composer -> {
           StatusComposerScreen(
             isSaving = uiState.isSaving,
+            errorMessage = uiState.errorMessage,
             onClose = { overlay = StatusOverlay.None },
             onPostText = { text ->
               viewModel.createTextStatus(text) {

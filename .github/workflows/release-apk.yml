@@ -3,6 +3,9 @@ name: Release APK
 on:
   push:
     branches: [ main ]
+    paths:
+      - buildSrc/src/main/kotlin/Configurations.kt
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,15 +22,8 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Create google-services.json
         env:
@@ -56,14 +52,43 @@ jobs:
           echo "version_name=$NAME" >> "$GITHUB_OUTPUT"
           echo "Resolved version $NAME ($CODE)"
 
-      - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+      - name: Ensure version has not already been released
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.ver.outputs.version_name }}+${{ steps.ver.outputs.version_code }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Bump versionCode and versionName before pushing to main."
+            exit 1
+          fi
+
+      - name: Restore release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "Release signing secrets are not configured."
+            exit 1
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/batchit-release.keystore"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "SIGNING_STORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease --no-daemon
 
       - name: Prepare release artifacts
         id: artifacts
         run: |
           mkdir -p dist
-          SRC=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
+          SRC=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
           DEST="dist/batchit-${{ steps.ver.outputs.version_name }}-${{ steps.ver.outputs.version_code }}.apk"
           cp "$SRC" "$DEST"
           TAG="v${{ steps.ver.outputs.version_name }}+${{ steps.ver.outputs.version_code }}"

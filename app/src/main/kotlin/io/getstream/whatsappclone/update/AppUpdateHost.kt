@@ -107,6 +107,30 @@ fun AppUpdateHost(
       )
     }
 
+    is AppUpdateUiState.ReadyToInstall -> {
+      AlertDialog(
+        onDismissRequest = {
+          if (!s.info.forceUpdate) resolvedViewModel.dismiss()
+        },
+        title = { Text(text = "Update ready") },
+        text = {
+          Text(text = "The update has downloaded. Tap Install to continue with Android's installer.")
+        },
+        confirmButton = {
+          TextButton(onClick = { resolvedViewModel.installApk(s.file) }) {
+            Text(text = "Install")
+          }
+        },
+        dismissButton = {
+          if (!s.info.forceUpdate) {
+            TextButton(onClick = { resolvedViewModel.dismiss() }) {
+              Text(text = stringResource(R.string.update_later))
+            }
+          }
+        }
+      )
+    }
+
     AppUpdateUiState.UpToDate -> {
       AlertDialog(
         onDismissRequest = { resolvedViewModel.dismiss() },

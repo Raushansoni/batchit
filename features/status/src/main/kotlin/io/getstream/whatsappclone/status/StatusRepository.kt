@@ -22,6 +22,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
@@ -149,7 +150,7 @@ class StatusRepository @Inject constructor() {
       uploadMedia(uid, id, imageUri)
     } catch (e: Exception) {
       logger.e(e) { "Image upload failed — using local uri" }
-      imageUri.toString()
+      return Result.failure(e)
     }
 
     val item = StatusItem(
@@ -175,7 +176,7 @@ class StatusRepository @Inject constructor() {
       uploadMedia(uid, id, videoUri)
     } catch (e: Exception) {
       logger.e(e) { "Video upload failed — using local uri" }
-      videoUri.toString()
+      return Result.failure(e)
     }
 
     val item = StatusItem(
@@ -215,18 +216,22 @@ class StatusRepository @Inject constructor() {
   suspend fun resolveViewerNames(viewerIds: List<String>): Map<String, String> {
     if (viewerIds.isEmpty()) return emptyMap()
     val db = firestoreOrNull() ?: return viewerIds.associateWith { it }
-    val names = mutableMapOf<String, String>()
-    viewerIds.distinct().chunked(10).forEach { chunk ->
-      chunk.forEach { viewerId ->
-        runCatching {
-          val snap = db.collection(USERS).document(viewerId).get().awaitTask()
-          val name = snap.getString("name")?.takeIf { it.isNotBlank() }
-            ?: snap.getString("username")?.takeIf { it.isNotBlank() }
-            ?: viewerId
-          names[viewerId] = name
-        }.onFailure {
-          names[viewerId] = viewerId
+    val ids = viewerIds.distinct()
+    val names = ids.associateWithTo(mutableMapOf()) { it }
+    ids.chunked(10).forEach { chunk ->
+      runCatching {
+        db.collection(USERS)
+          .whereIn(FieldPath.documentId(), chunk)
+          .get()
+          .awaitTask()
+      }.onSuccess { snapshot ->
+        snapshot.documents.forEach { document ->
+          names[document.id] = document.getString("name")?.takeIf { it.isNotBlank() }
+            ?: document.getString("username")?.takeIf { it.isNotBlank() }
+            ?: document.id
         }
+      }.onFailure { error ->
+        logger.e(error) { "Viewer-name lookup failed" }
       }
     }
     return names
