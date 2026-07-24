@@ -28,10 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import dagger.hilt.android.EntryPointAccessors
 import io.getstream.whatsappclone.auth.AuthUiState
 import io.getstream.whatsappclone.auth.AuthViewModel
 import io.getstream.whatsappclone.auth.ui.AuthFlow
@@ -41,15 +43,11 @@ import io.getstream.whatsappclone.designsystem.theme.WhatsAppCloneComposeTheme
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppNavHost
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
-import io.getstream.whatsappclone.notifications.BatchItNotificationCoordinator
 import io.getstream.whatsappclone.notifications.NotificationDeepLink
-import io.getstream.whatsappclone.notifications.NotificationDeepLinkBus
+import io.getstream.whatsappclone.notifications.NotificationEntryPoint
 import io.getstream.whatsappclone.settings.SettingsViewModel
 import io.getstream.whatsappclone.update.AppUpdateHost
 import io.getstream.whatsappclone.video.IncomingCallOverlay
-import androidx.compose.ui.platform.LocalContext
-import dagger.hilt.android.EntryPointAccessors
-import io.getstream.whatsappclone.notifications.NotificationEntryPoint
 
 @Composable
 fun WhatsAppCloneMain(
@@ -63,7 +61,9 @@ fun WhatsAppCloneMain(
   val notificationEntry = remember(appContext) {
     EntryPointAccessors.fromApplication(appContext, NotificationEntryPoint::class.java)
   }
-  val notificationCoordinator = remember(notificationEntry) { notificationEntry.notificationCoordinator() }
+  val notificationCoordinator = remember(notificationEntry) {
+    notificationEntry.notificationCoordinator()
+  }
   val deepLinkBus = remember(notificationEntry) { notificationEntry.deepLinkBus() }
 
   WhatsAppCloneComposeTheme(darkTheme = darkTheme) {
