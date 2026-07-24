@@ -3,7 +3,7 @@ object Configurations {
   const val minSdk = 24
   const val majorVersion = 1
   const val minorVersion = 1
-  const val patchVersion = 7
+  const val patchVersion = 8
   const val versionName = "$majorVersion.$minorVersion.$patchVersion"
-  const val versionCode = 13
+  const val versionCode = 14
 }

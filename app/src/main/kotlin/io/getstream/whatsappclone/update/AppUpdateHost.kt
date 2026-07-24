@@ -114,7 +114,9 @@ fun AppUpdateHost(
         },
         title = { Text(text = "Update ready") },
         text = {
-          Text(text = "The update has downloaded. Tap Install to continue with Android's installer.")
+          Text(
+            text = "The update has downloaded. Tap Install to continue with Android's installer."
+          )
         },
         confirmButton = {
           TextButton(onClick = { resolvedViewModel.installApk(s.file) }) {
