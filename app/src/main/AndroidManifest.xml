@@ -72,6 +72,19 @@
       </intent-filter>
     </activity>
 
+    <!--
+         Receives Stream's data-only FCM messages while the app process is in
+         the background or has been stopped. Without this service, messages
+         are only observed after ChatClient reconnects when the app is opened.
+    -->
+    <service
+      android:name="io.getstream.android.push.firebase.ChatFirebaseMessagingService"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+      </intent-filter>
+    </service>
+
     <receiver
       android:name=".notifications.CallActionReceiver"
       android:exported="false">

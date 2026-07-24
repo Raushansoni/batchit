@@ -77,11 +77,12 @@ class AppUpdateRepository @Inject constructor(
       val conn = (URL(GITHUB_LATEST_API).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"
         setRequestProperty("Accept", "application/vnd.github+json")
+        setRequestProperty("User-Agent", "BatchIt-Android")
         connectTimeout = 10_000
         readTimeout = 10_000
       }
       if (conn.responseCode !in 200..299) return null
-      val body = conn.inputStream.bufferedReader().readText()
+      val body = conn.inputStream.bufferedReader().use { it.readText() }
       val json = JSONObject(body)
       val assets = json.optJSONArray("assets") ?: return null
 
@@ -98,18 +99,8 @@ class AppUpdateRepository @Inject constructor(
       }
 
       if (updateJsonUrl != null) {
-        val metaConn = (URL(updateJsonUrl).openConnection() as HttpURLConnection).apply {
-          connectTimeout = 10_000
-          readTimeout = 10_000
-        }
-        val meta = JSONObject(metaConn.inputStream.bufferedReader().readText())
-        return AppUpdateInfo(
-          versionCode = meta.optInt("versionCode"),
-          versionName = meta.optString("versionName"),
-          apkUrl = meta.optString("apkUrl").ifBlank { apkUrl.orEmpty() },
-          forceUpdate = meta.optBoolean("forceUpdate"),
-          notes = meta.optString("notes")
-        ).takeIf { it.versionCode > 0 && it.apkUrl.isNotBlank() }
+        val metadata = fetchReleaseMetadata(updateJsonUrl, apkUrl)
+        if (metadata != null) return metadata
       }
 
       // Fallback: parse tag like v1.1.1+7
@@ -127,6 +118,34 @@ class AppUpdateRepository @Inject constructor(
       }
     } catch (error: Throwable) {
       streamLog { "App update GitHub read failed: ${error.message}" }
+      null
+    }
+  }
+
+  /**
+   * `app_update.json` is a convenience asset, not a requirement for an update.
+   * If its download fails, use the release tag and APK asset below instead.
+   */
+  private fun fetchReleaseMetadata(metadataUrl: String, fallbackApkUrl: String?): AppUpdateInfo? {
+    return try {
+      val conn = (URL(metadataUrl).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        setRequestProperty("Accept", "application/json")
+        setRequestProperty("User-Agent", "BatchIt-Android")
+        connectTimeout = 10_000
+        readTimeout = 10_000
+      }
+      if (conn.responseCode !in 200..299) return null
+      val meta = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+      AppUpdateInfo(
+        versionCode = meta.optInt("versionCode"),
+        versionName = meta.optString("versionName"),
+        apkUrl = meta.optString("apkUrl").ifBlank { fallbackApkUrl.orEmpty() },
+        forceUpdate = meta.optBoolean("forceUpdate"),
+        notes = meta.optString("notes")
+      ).takeIf { it.versionCode > 0 && it.apkUrl.isNotBlank() }
+    } catch (error: Throwable) {
+      streamLog { "App update metadata read failed: ${error.message}" }
       null
     }
   }
