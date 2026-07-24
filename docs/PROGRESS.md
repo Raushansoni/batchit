@@ -2,7 +2,7 @@
 
 Living changelog of what BatchIt has shipped beyond the upstream GetStream WhatsApp clone. Update this file when a meaningful feature or milestone lands.
 
-**Current release:** `1.1.2` (versionCode `8`) — July 2026  
+**Current release:** `1.1.5` (versionCode `11`) — July 2026  
 **Firebase:** `batchit-prod` · **Package:** `com.batchit.app`
 
 ---
