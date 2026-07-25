@@ -29,22 +29,27 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-          else
-            echo "GOOGLE_SERVICES_JSON secret not set; using placeholder for CI compile."
-            cp app/google-services.json.example app/google-services.json
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "GOOGLE_SERVICES_JSON secret is required for production releases."
+            exit 1
           fi
+          printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
 
       - name: Create Android app configuration
         env:
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+          STREAM_API_KEY: ${{ secrets.STREAM_API_KEY }}
+          STREAM_TOKEN_URL: ${{ secrets.STREAM_TOKEN_URL }}
         run: |
-          if [ -z "$GOOGLE_WEB_CLIENT_ID" ]; then
-            echo "GOOGLE_WEB_CLIENT_ID secret is required for Google Sign-In in release builds."
-            exit 1
-          fi
-          printf 'GOOGLE_WEB_CLIENT_ID=%s\n' "$GOOGLE_WEB_CLIENT_ID" > secrets.properties
+          : > secrets.properties
+          for name in GOOGLE_WEB_CLIENT_ID STREAM_API_KEY STREAM_TOKEN_URL; do
+            value="${!name}"
+            if [ -z "$value" ] || [ "$value" = "REPLACE_ME" ]; then
+              echo "$name secret is required for production releases."
+              exit 1
+            fi
+            printf '%s=%s\n' "$name" "$value" >> secrets.properties
+          done
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
