@@ -36,6 +36,16 @@ jobs:
             cp app/google-services.json.example app/google-services.json
           fi
 
+      - name: Create Android app configuration
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          if [ -z "$GOOGLE_WEB_CLIENT_ID" ]; then
+            echo "GOOGLE_WEB_CLIENT_ID secret is required for Google Sign-In in release builds."
+            exit 1
+          fi
+          printf 'GOOGLE_WEB_CLIENT_ID=%s\n' "$GOOGLE_WEB_CLIENT_ID" > secrets.properties
+
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
