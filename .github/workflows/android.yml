@@ -23,15 +23,8 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Cache Gradle and wrapper
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Create google-services.json
         env:
@@ -47,5 +40,5 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Build with Gradle
-        run: ./gradlew build
+      - name: Spotless check and assemble debug
+        run: ./gradlew spotlessCheck :app:assembleDebug
