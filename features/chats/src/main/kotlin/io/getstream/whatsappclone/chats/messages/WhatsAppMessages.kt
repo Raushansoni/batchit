@@ -16,6 +16,8 @@
 
 package io.getstream.whatsappclone.chats.messages
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
@@ -56,6 +58,31 @@ fun WhatsAppMessages(
     { video: Boolean -> whatsAppMessagesViewModel.navigateToVideoCall(channelId, video) }
   }
 
+  val requestLocation = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.RequestMultiplePermissions()
+  ) { result ->
+    val granted = result.values.any { it }
+    if (granted) {
+      whatsAppMessagesViewModel.shareLocationPlaceholder()
+    } else {
+      whatsAppMessagesViewModel.showLocationPermissionDenied()
+    }
+  }
+  val onShareLocation = remember(whatsAppMessagesViewModel) {
+    {
+      if (whatsAppMessagesViewModel.hasLocationPermission()) {
+        whatsAppMessagesViewModel.shareLocationPlaceholder()
+      } else {
+        requestLocation.launch(
+          arrayOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+          )
+        )
+      }
+    }
+  }
+
   WhatsAppChatTheme {
     Column(Modifier.fillMaxSize()) {
       WhatsAppMessageTopBar(
@@ -63,7 +90,7 @@ fun WhatsAppMessages(
         navigateToVideoCall = onVideoCall,
         onBackClick = onBack,
         onStarLatestMessage = whatsAppMessagesViewModel::starLatestMessage,
-        onShareLocation = whatsAppMessagesViewModel::shareLocationPlaceholder
+        onShareLocation = onShareLocation
       )
 
       MessagesScreen(

@@ -45,12 +45,10 @@ class IncomingCallViewModel @Inject constructor(
   private val callHistoryRepository: CallHistoryRepository
 ) : ViewModel() {
 
-  fun onCallAccepted(call: Call, isVideo: Boolean) {
-    record(call, outgoing = false, missed = false, isVideo = isVideo)
-  }
-
   fun accept(call: Call, isVideo: Boolean, onJoined: (Call) -> Unit) {
     viewModelScope.launch {
+      // Accept the ringing call so the caller is notified, then join.
+      runCatching { call.accept() }
       val result = call.join()
       result.onSuccess {
         record(call, outgoing = false, missed = false, isVideo = isVideo)
@@ -116,8 +114,9 @@ fun IncomingCallOverlay(
       },
       onAcceptedContent = {
         LaunchedEffect(call.id) {
-          viewModel.onCallAccepted(call, isVideo)
-          onCallConnected(call.id, isVideo)
+          viewModel.accept(call, isVideo) { joined ->
+            onCallConnected(joined.id, isVideo)
+          }
         }
       }
     )

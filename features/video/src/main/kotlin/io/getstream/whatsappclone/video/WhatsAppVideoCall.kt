@@ -142,7 +142,10 @@ private fun WhatsAppVideoCallContent(
                 {
                   LeaveCallAction(
                     modifier = Modifier.size(52.dp),
-                    onCallAction = { onBackPressed.invoke() }
+                    onCallAction = {
+                      call.leave()
+                      onBackPressed.invoke()
+                    }
                   )
                 }
               )
@@ -170,7 +173,10 @@ private fun WhatsAppVideoCallContent(
                 {
                   LeaveCallAction(
                     modifier = Modifier.size(52.dp),
-                    onCallAction = { onBackPressed.invoke() }
+                    onCallAction = {
+                      call.leave()
+                      onBackPressed.invoke()
+                    }
                   )
                 }
               )

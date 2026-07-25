@@ -18,19 +18,25 @@ package io.getstream.whatsappclone.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
+import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.getstream.log.streamLog
 import io.getstream.whatsappclone.designsystem.theme.ThemeMode
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 data class PrivacySettings(
   val lastSeenVisible: Boolean = true,
@@ -153,10 +159,51 @@ class SettingsRepository @Inject constructor(
     try {
       val profile = com.google.firebase.auth.UserProfileChangeRequest.Builder()
         .setDisplayName(name)
+        .setPhotoUri(if (imageUrl.isNotBlank()) Uri.parse(imageUrl) else null)
         .build()
       Firebase.auth.currentUser?.updateProfile(profile)
     } catch (error: Throwable) {
       streamLog { "Firebase displayName update skipped: ${error.message}" }
+    }
+
+    try {
+      Firebase.firestore.collection(USERS).document(Firebase.auth.currentUser?.uid.orEmpty())
+        .set(
+          mapOf(
+            "name" to name,
+            "image" to imageUrl
+          ),
+          SetOptions.merge()
+        )
+    } catch (error: Throwable) {
+      streamLog { "Firestore profile image write skipped: ${error.message}" }
+    }
+  }
+
+  /**
+   * Uploads the picked profile photo to Firebase Storage under
+   * `profile_images/<uid>.jpg` and persists the resulting URL via [updateProfile].
+   * Returns the download URL on success, or null on failure.
+   */
+  suspend fun uploadProfileImage(uri: Uri): String? {
+    val user = Firebase.auth.currentUser ?: run {
+      streamLog { "uploadProfileImage: no Firebase user" }
+      return null
+    }
+    return try {
+      val ref = Firebase.storage.reference
+        .child("profile_images/${user.uid}.jpg")
+      ref.putFile(uri).awaitTask()
+      val downloadUrl = ref.downloadUrl.awaitTask().toString()
+      updateProfile(
+        name = _userProfile.value.name,
+        about = _userProfile.value.about,
+        imageUrl = downloadUrl
+      )
+      downloadUrl
+    } catch (error: Throwable) {
+      streamLog { "uploadProfileImage failed: ${error.message}" }
+      null
     }
   }
 
@@ -296,4 +343,9 @@ class SettingsRepository @Inject constructor(
     private const val KEY_ABOUT = "profile_about"
     private const val KEY_IMAGE = "profile_image"
   }
+}
+
+private suspend fun <T> Task<T>.awaitTask(): T = suspendCancellableCoroutine { cont ->
+  addOnSuccessListener { result -> cont.resume(result) }
+  addOnFailureListener { error -> cont.resumeWithException(error) }
 }

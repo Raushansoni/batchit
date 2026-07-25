@@ -50,6 +50,7 @@ dependencies {
   implementation(libs.firebase.firestore)
 
   implementation(libs.accompanist.permissions)
+  implementation(libs.google.play.location)
 
   implementation(libs.androidx.lifecycle.runtimeCompose)
   implementation(libs.androidx.lifecycle.viewModelCompose)

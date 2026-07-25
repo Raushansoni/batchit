@@ -44,6 +44,8 @@
   <string name="settings_account_name">Name</string>
   <string name="settings_account_about">About</string>
   <string name="settings_account_save">Save</string>
+  <string name="settings_account_change_photo">Change photo</string>
+  <string name="settings_account_change_photo_hint">Tap the camera badge to upload a profile photo.</string>
   <string name="settings_notifications_title">Notifications</string>
   <string name="settings_notifications_messages">Message notifications</string>
   <string name="settings_notifications_messages_desc">Show notifications for new messages</string>
@@ -66,4 +68,5 @@
   <string name="settings_blocked_title">Blocked contacts</string>
   <string name="settings_blocked_empty">No blocked contacts</string>
   <string name="settings_blocked_unblock">Unblock</string>
+  <string name="cancel">OK</string>
 </resources>

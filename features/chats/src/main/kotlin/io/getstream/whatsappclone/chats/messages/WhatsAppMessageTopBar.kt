@@ -31,12 +31,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.getstream.whatsappclone.chats.R
+import io.getstream.chat.android.client.ChatClient
+import io.getstream.chat.android.models.Channel
+import io.getstream.chat.android.models.User
 import io.getstream.whatsappclone.designsystem.component.BatchItAvatar
 import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
@@ -125,22 +129,36 @@ private fun WhatsAppMessageUserInfo(
     WhatsAppMessageUiState.Loading -> WhatsAppLoadingIndicator()
     WhatsAppMessageUiState.Error -> Unit
     is WhatsAppMessageUiState.Success -> {
+      val peer = rememberPeer(messageUiState.data)
       Row(verticalAlignment = Alignment.CenterVertically) {
         BatchItAvatar(
-          imageUrl = messageUiState.data.image.takeIf { it.isNotEmpty() }
+          imageUrl = peer.image.takeIf { it.isNotEmpty() }
             ?: io.getstream.whatsappclone.designsystem.R.drawable.stream_logo,
           size = 34.dp
         )
 
         Text(
           modifier = Modifier.padding(start = 12.dp),
-          text = messageUiState.data.name,
+          text = peer.name.takeIf { it.isNotBlank() } ?: peer.id,
           color = contentColor,
           style = MaterialTheme.typography.titleMedium,
           maxLines = 1
         )
       }
     }
+  }
+}
+
+/**
+ * Returns the user on the other side of this 1:1 channel so the header shows the
+ * peer's name and avatar instead of the signed-in user or empty channel metadata.
+ */
+@Composable
+private fun rememberPeer(channel: Channel): User {
+  val me = remember { runCatching { ChatClient.instance().getCurrentUser()?.id }.getOrNull() }
+  return remember(channel.id, channel.members) {
+    channel.members.firstOrNull { it.user.id != me }?.user ?: channel.members.firstOrNull()?.user
+      ?: User(id = channel.id, name = channel.name)
   }
 }
 

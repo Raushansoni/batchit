@@ -19,10 +19,13 @@ package io.getstream.whatsappclone.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import android.net.Uri
 import io.getstream.whatsappclone.designsystem.theme.ThemeMode
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -74,6 +77,16 @@ class SettingsViewModel @Inject constructor(
       initialValue = emptySet()
     )
 
+  private val _imageUploading = MutableStateFlow(false)
+  val imageUploading: StateFlow<Boolean> = _imageUploading.asStateFlow()
+
+  private val _profileMessage = MutableStateFlow<String?>(null)
+  val profileMessage: StateFlow<String?> = _profileMessage.asStateFlow()
+
+  fun clearProfileMessage() {
+    _profileMessage.value = null
+  }
+
   init {
     settingsRepository.syncProfileFromFirebaseAuth()
     settingsRepository.syncPrivacyFromFirestore()
@@ -122,6 +135,16 @@ class SettingsViewModel @Inject constructor(
   fun updateProfile(name: String, about: String) {
     viewModelScope.launch {
       settingsRepository.updateProfile(name = name.trim(), about = about.trim())
+      _profileMessage.value = "Profile saved"
+    }
+  }
+
+  fun uploadProfileImage(uri: Uri) {
+    viewModelScope.launch {
+      _imageUploading.value = true
+      val url = settingsRepository.uploadProfileImage(uri)
+      _imageUploading.value = false
+      _profileMessage.value = url?.let { "Profile photo updated" } ?: "Could not update photo"
     }
   }
 
