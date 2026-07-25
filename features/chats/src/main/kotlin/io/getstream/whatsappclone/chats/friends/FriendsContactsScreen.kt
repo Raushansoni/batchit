@@ -16,6 +16,7 @@
 
 package io.getstream.whatsappclone.chats.friends
 
+import android.Manifest
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -52,7 +53,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +62,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import android.Manifest
 import io.getstream.whatsappclone.chats.R
 import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
 import io.getstream.whatsappclone.designsystem.theme.getTitleColor
@@ -214,7 +213,9 @@ fun FriendsContactsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                   onClick = { contactsPermission.launchPermissionRequest() },
-                  colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                  colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                  )
                 ) {
                   Text(
                     text = stringResource(id = R.string.friends_allow_contacts),

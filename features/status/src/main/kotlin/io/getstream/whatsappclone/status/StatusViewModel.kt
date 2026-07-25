@@ -82,7 +82,10 @@ class StatusViewModel @Inject constructor(
   )
 
   fun onTabActive() {
-    if (!hasLoadedOnce || System.currentTimeMillis() - lastRefreshAtMillis >= STATUS_REFRESH_INTERVAL_MS) {
+    if (
+      !hasLoadedOnce ||
+      System.currentTimeMillis() - lastRefreshAtMillis >= STATUS_REFRESH_INTERVAL_MS
+    ) {
       refresh()
     }
   }

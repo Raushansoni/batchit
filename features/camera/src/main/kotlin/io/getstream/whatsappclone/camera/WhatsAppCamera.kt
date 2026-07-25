@@ -70,16 +70,16 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
 import io.getstream.log.streamLog
+import io.getstream.whatsappclone.designsystem.icon.WhatsAppIcons
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.Executor
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 private const val PHOTO_SAVED_MESSAGE = "Photo saved — share from chat or Status"
 

@@ -106,7 +106,10 @@ fun AuthFlow(
             .padding(bottom = 32.dp),
           onClick = authViewModel::clearError
         ) {
-          Text(text = stringResource(id = R.string.auth_continue), color = MaterialTheme.colorScheme.secondary)
+          Text(
+            text = stringResource(id = R.string.auth_continue),
+            color = MaterialTheme.colorScheme.secondary
+          )
         }
       }
     }

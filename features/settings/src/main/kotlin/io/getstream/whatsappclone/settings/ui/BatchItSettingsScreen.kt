@@ -41,9 +41,9 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Storage

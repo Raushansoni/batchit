@@ -56,7 +56,9 @@ class FriendsViewModel @Inject constructor(
   savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-  private val pickerMode = when (savedStateHandle.get<String>(WhatsAppScreens.FriendsContacts.KEY_MODE)) {
+  private val pickerMode = when (
+    savedStateHandle.get<String>(WhatsAppScreens.FriendsContacts.KEY_MODE)
+  ) {
     WhatsAppScreens.FriendsContacts.MODE_CALL_AUDIO -> FriendsPickerMode.CallAudio
     WhatsAppScreens.FriendsContacts.MODE_CALL_VIDEO -> FriendsPickerMode.CallVideo
     else -> FriendsPickerMode.Chat

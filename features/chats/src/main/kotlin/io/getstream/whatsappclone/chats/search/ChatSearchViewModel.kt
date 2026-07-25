@@ -21,9 +21,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.client.api.models.QueryChannelsRequest
-import io.getstream.chat.android.models.querysort.QuerySortByField
 import io.getstream.chat.android.models.Channel
 import io.getstream.chat.android.models.Filters
+import io.getstream.chat.android.models.querysort.QuerySortByField
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
 import javax.inject.Inject

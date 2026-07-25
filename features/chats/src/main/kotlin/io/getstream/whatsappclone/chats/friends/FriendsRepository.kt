@@ -17,6 +17,7 @@
 package io.getstream.whatsappclone.chats.friends
 
 import android.content.Context
+import android.provider.ContactsContract
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.FieldValue
@@ -31,7 +32,6 @@ import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import android.provider.ContactsContract
 
 data class BatchItUser(
   val uid: String,
@@ -201,7 +201,9 @@ class FriendsRepository @Inject constructor(
       ContactsContract.CommonDataKinds.Email.DISPLAY_NAME_PRIMARY + " ASC"
     )?.use { cursor ->
       val idIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Email.CONTACT_ID)
-      val nameIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Email.DISPLAY_NAME_PRIMARY)
+      val nameIdx = cursor.getColumnIndex(
+        ContactsContract.CommonDataKinds.Email.DISPLAY_NAME_PRIMARY
+      )
       val emailIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Email.ADDRESS)
       while (cursor.moveToNext()) {
         val id = cursor.getString(idIdx) ?: continue
@@ -224,7 +226,9 @@ class FriendsRepository @Inject constructor(
       ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY + " ASC"
     )?.use { cursor ->
       val idIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
-      val nameIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY)
+      val nameIdx = cursor.getColumnIndex(
+        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY
+      )
       val phoneIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
       while (cursor.moveToNext()) {
         val id = cursor.getString(idIdx) ?: continue

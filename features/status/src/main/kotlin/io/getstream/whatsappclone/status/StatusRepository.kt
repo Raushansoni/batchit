@@ -21,8 +21,8 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
@@ -340,6 +340,7 @@ class StatusRepository @Inject constructor() {
     val userId = getString("userId") ?: return null
     val typeName = getString("type") ?: StatusType.TEXT.name
     val type = runCatching { StatusType.valueOf(typeName) }.getOrDefault(StatusType.TEXT)
+
     @Suppress("UNCHECKED_CAST")
     val viewedBy = (get("viewedBy") as? List<*>)?.mapNotNull { it as? String }.orEmpty()
     return StatusItem(

@@ -37,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -104,7 +103,10 @@ fun UsernameSetupScreen(
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
         enabled = isValid
       ) {
-        Text(text = stringResource(id = R.string.auth_continue), color = MaterialTheme.colorScheme.onSecondary)
+        Text(
+          text = stringResource(id = R.string.auth_continue),
+          color = MaterialTheme.colorScheme.onSecondary
+        )
       }
     }
   }

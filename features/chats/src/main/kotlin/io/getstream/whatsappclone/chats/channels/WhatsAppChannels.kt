@@ -18,6 +18,7 @@ package io.getstream.whatsappclone.chats.channels
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,7 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,10 +51,10 @@ import io.getstream.chat.android.compose.ui.channels.list.ChannelList
 import io.getstream.chat.android.compose.viewmodel.channels.ChannelListViewModel
 import io.getstream.chat.android.compose.viewmodel.channels.ChannelViewModelFactory
 import io.getstream.chat.android.models.Channel
-import io.getstream.chat.android.models.querysort.QuerySortByField
 import io.getstream.chat.android.models.Filters
-import io.getstream.whatsappclone.chats.friends.BatchItUser
+import io.getstream.chat.android.models.querysort.QuerySortByField
 import io.getstream.whatsappclone.chats.R
+import io.getstream.whatsappclone.chats.friends.BatchItUser
 import io.getstream.whatsappclone.chats.theme.WhatsAppChatTheme
 import io.getstream.whatsappclone.designsystem.component.BatchItFab
 import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator

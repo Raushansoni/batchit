@@ -31,7 +31,6 @@ import io.getstream.chat.android.state.plugin.config.StatePluginConfig
 import io.getstream.chat.android.state.plugin.factory.StreamStatePluginFactory
 import io.getstream.log.streamLog
 import io.getstream.whatsappclone.chats.BuildConfig
-import io.getstream.whatsappclone.chats.initializer.StreamLogInitializer
 
 /**
  * Initializes Stream ChatClient only. User connection happens after auth via StreamSessionManager.

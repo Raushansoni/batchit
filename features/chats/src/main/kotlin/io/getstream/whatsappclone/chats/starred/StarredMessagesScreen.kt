@@ -100,7 +100,9 @@ fun StarredMessagesScreen(
               .padding(horizontal = 16.dp, vertical = 12.dp)
           ) {
             Text(
-              text = entry.previewText.ifBlank { stringResource(id = R.string.starred_messages_no_preview) },
+              text = entry.previewText.ifBlank {
+                stringResource(id = R.string.starred_messages_no_preview)
+              },
               style = MaterialTheme.typography.bodyLarge,
               color = getTitleColor(),
               maxLines = 2,

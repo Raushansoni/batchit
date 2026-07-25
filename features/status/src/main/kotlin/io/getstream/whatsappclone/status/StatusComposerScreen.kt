@@ -221,7 +221,8 @@ fun StatusComposerScreen(
               text.isNotBlank() -> onPostText(text)
             }
           },
-          enabled = !isSaving && (selectedImage != null || selectedVideo != null || text.isNotBlank()),
+          enabled = !isSaving &&
+            (selectedImage != null || selectedVideo != null || text.isNotBlank()),
           colors = ButtonDefaults.buttonColors(containerColor = GREEN500),
           shape = CircleShape,
           modifier = Modifier.size(48.dp)

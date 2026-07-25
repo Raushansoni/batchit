@@ -36,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -91,7 +90,10 @@ fun ProfileSetupScreen(
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
         enabled = name.isNotBlank()
       ) {
-        Text(text = stringResource(id = R.string.auth_save), color = MaterialTheme.colorScheme.onSecondary)
+        Text(
+          text = stringResource(id = R.string.auth_save),
+          color = MaterialTheme.colorScheme.onSecondary
+        )
       }
     }
   }

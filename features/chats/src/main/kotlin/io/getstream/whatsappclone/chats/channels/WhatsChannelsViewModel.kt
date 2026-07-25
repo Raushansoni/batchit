@@ -21,6 +21,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.models.Channel
+import io.getstream.whatsappclone.chats.friends.BatchItUser
 import io.getstream.whatsappclone.chats.friends.FriendsRepository
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
@@ -44,8 +45,8 @@ class WhatsChannelsViewModel @Inject constructor(
   private val _error = MutableStateFlow<String?>(null)
   val error: StateFlow<String?> = _error.asStateFlow()
 
-  private val _groupFriends = MutableStateFlow<List<io.getstream.whatsappclone.chats.friends.BatchItUser>>(emptyList())
-  val groupFriends: StateFlow<List<io.getstream.whatsappclone.chats.friends.BatchItUser>> = _groupFriends.asStateFlow()
+  private val _groupFriends = MutableStateFlow<List<BatchItUser>>(emptyList())
+  val groupFriends: StateFlow<List<BatchItUser>> = _groupFriends.asStateFlow()
 
   private val _isLoadingGroupFriends = MutableStateFlow(false)
   val isLoadingGroupFriends: StateFlow<Boolean> = _isLoadingGroupFriends.asStateFlow()
