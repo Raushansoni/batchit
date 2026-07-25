@@ -125,7 +125,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Write Firestore config/app_update
-        continue-on-error: true
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           VERSION_CODE: ${{ steps.ver.outputs.version_code }}
@@ -134,12 +133,19 @@ jobs:
         run: |
           if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
             echo "Skipping Firestore write — add repo secret FIREBASE_SERVICE_ACCOUNT to enable."
+            echo "Without this secret, old app builds that only read Firestore will not see this release."
             exit 0
           fi
           npm install --silent firebase-admin@12
           node <<'NODE'
           const admin = require('firebase-admin');
-          const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          let sa;
+          try {
+            sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          } catch (err) {
+            console.error('FIREBASE_SERVICE_ACCOUNT is set but is not valid JSON:', err.message);
+            process.exit(1);
+          }
           admin.initializeApp({ credential: admin.credential.cert(sa) });
           const payload = {
             versionCode: Number(process.env.VERSION_CODE),
@@ -149,13 +155,21 @@ jobs:
             notes: `BatchIt ${process.env.VERSION_NAME}`,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           };
+          if (!Number.isFinite(payload.versionCode) || payload.versionCode <= 0) {
+            console.error('Invalid versionCode in Firestore payload:', payload.versionCode);
+            process.exit(1);
+          }
+          if (!payload.apkUrl) {
+            console.error('Missing apkUrl in Firestore payload');
+            process.exit(1);
+          }
           admin.firestore().doc('config/app_update').set(payload, { merge: true })
             .then(() => {
-              console.log('Wrote config/app_update', payload);
+              console.log('Wrote config/app_update', JSON.stringify(payload, null, 2));
               process.exit(0);
             })
             .catch((err) => {
-              console.error(err);
+              console.error('Failed to write config/app_update:', err);
               process.exit(1);
             });
           NODE

@@ -35,16 +35,24 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.getstream.log.streamLog
 import java.io.File
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 sealed interface AppUpdateUiState {
   data object Idle : AppUpdateUiState
   data class Checking(val userInitiated: Boolean = false) : AppUpdateUiState
   data class Available(val info: AppUpdateInfo) : AppUpdateUiState
-  data class Downloading(val info: AppUpdateInfo) : AppUpdateUiState
+  data class Downloading(
+    val info: AppUpdateInfo,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = -1L,
+    val progress: Float = 0f
+  ) : AppUpdateUiState
   data class ReadyToInstall(val info: AppUpdateInfo, val file: File) : AppUpdateUiState
   data object UpToDate : AppUpdateUiState
   data class Error(val message: String) : AppUpdateUiState
@@ -62,15 +70,19 @@ class AppUpdateViewModel @Inject constructor(
 
   private var downloadId: Long = -1L
   private var pendingInfo: AppUpdateInfo? = null
+  private var pendingInstallFile: File? = null
   private var receiverRegistered = false
+  private var progressJob: Job? = null
 
   private val downloadReceiver = object : BroadcastReceiver() {
     override fun onReceive(ctx: Context?, intent: Intent?) {
       val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: return
       if (id != downloadId) return
+      progressJob?.cancel()
       val info = pendingInfo ?: return
       val file = resolveDownloadedFile(id)
       if (file != null && file.exists()) {
+        pendingInstallFile = file
         _uiState.value = AppUpdateUiState.ReadyToInstall(info, file)
         installApk(file)
       } else {
@@ -110,6 +122,7 @@ class AppUpdateViewModel @Inject constructor(
   fun dismiss() {
     val state = _uiState.value
     if (state is AppUpdateUiState.Available && state.info.forceUpdate) return
+    if (state is AppUpdateUiState.ReadyToInstall && state.info.forceUpdate) return
     _uiState.value = AppUpdateUiState.Dismissed
   }
 
@@ -117,6 +130,7 @@ class AppUpdateViewModel @Inject constructor(
     try {
       ensureReceiver()
       pendingInfo = info
+      clearStaleApk(info.versionCode)
       val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
       val request = DownloadManager.Request(Uri.parse(info.apkUrl))
         .setTitle("BatchIt ${info.versionName}")
@@ -131,22 +145,39 @@ class AppUpdateViewModel @Inject constructor(
         .setAllowedOverRoaming(true)
       downloadId = dm.enqueue(request)
       _uiState.value = AppUpdateUiState.Downloading(info)
+      startProgressPolling(info)
     } catch (error: Throwable) {
       streamLog { "APK download failed: ${error.message}" }
       _uiState.value = AppUpdateUiState.Error(error.message ?: "Download failed")
     }
   }
 
+  /** Called when the host activity resumes (e.g. after granting unknown-sources). */
+  fun onHostResumed() {
+    val file = pendingInstallFile ?: return
+    if (!file.exists()) return
+    if (
+      Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+      !context.packageManager.canRequestPackageInstalls()
+    ) {
+      return
+    }
+    if (_uiState.value is AppUpdateUiState.ReadyToInstall) {
+      installApk(file)
+    }
+  }
+
   fun installApk(file: File) {
     try {
+      pendingInstallFile = file
       if (
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
         !context.packageManager.canRequestPackageInstalls()
       ) {
-        _uiState.value = AppUpdateUiState.ReadyToInstall(
-          pendingInfo ?: return,
-          file
-        )
+        val info = pendingInfo
+        if (info != null) {
+          _uiState.value = AppUpdateUiState.ReadyToInstall(info, file)
+        }
         context.startActivity(
           Intent(
             Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -169,8 +200,66 @@ class AppUpdateViewModel @Inject constructor(
     } catch (error: Throwable) {
       streamLog { "APK install intent failed: ${error.message}" }
       _uiState.value = AppUpdateUiState.Error(
-        "Cannot open installer. Allow “Install unknown apps” for BatchIt."
+        "Cannot install update. Allow “Install unknown apps” for BatchIt, " +
+          "and make sure you are not mixing debug and release builds."
       )
+    }
+  }
+
+  private fun startProgressPolling(info: AppUpdateInfo) {
+    progressJob?.cancel()
+    progressJob = viewModelScope.launch {
+      val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+      while (isActive) {
+        val progress = queryProgress(dm, downloadId) ?: break
+        if (_uiState.value !is AppUpdateUiState.Downloading) break
+        _uiState.value = AppUpdateUiState.Downloading(
+          info = info,
+          downloadedBytes = progress.downloaded,
+          totalBytes = progress.total,
+          progress = progress.fraction
+        )
+        if (progress.status == DownloadManager.STATUS_SUCCESSFUL ||
+          progress.status == DownloadManager.STATUS_FAILED
+        ) {
+          break
+        }
+        delay(PROGRESS_POLL_MS)
+      }
+    }
+  }
+
+  private data class DownloadProgress(
+    val downloaded: Long,
+    val total: Long,
+    val fraction: Float,
+    val status: Int
+  )
+
+  private fun queryProgress(dm: DownloadManager, id: Long): DownloadProgress? {
+    if (id < 0L) return null
+    val cursor: Cursor = dm.query(DownloadManager.Query().setFilterById(id)) ?: return null
+    cursor.use {
+      if (!it.moveToFirst()) return null
+      val statusIdx = it.getColumnIndex(DownloadManager.COLUMN_STATUS)
+      val downloadedIdx = it.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+      val totalIdx = it.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+      val status = if (statusIdx >= 0) it.getInt(statusIdx) else -1
+      val downloaded = if (downloadedIdx >= 0) it.getLong(downloadedIdx) else 0L
+      val total = if (totalIdx >= 0) it.getLong(totalIdx) else -1L
+      val fraction = when {
+        total > 0L -> (downloaded.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+        else -> 0f
+      }
+      return DownloadProgress(downloaded, total, fraction, status)
+    }
+  }
+
+  private fun clearStaleApk(versionCode: Int) {
+    val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return
+    val target = File(dir, "batchit-update-$versionCode.apk")
+    if (target.exists()) {
+      runCatching { target.delete() }
     }
   }
 
@@ -204,10 +293,15 @@ class AppUpdateViewModel @Inject constructor(
   }
 
   override fun onCleared() {
+    progressJob?.cancel()
     if (receiverRegistered) {
       runCatching { context.unregisterReceiver(downloadReceiver) }
       receiverRegistered = false
     }
     super.onCleared()
+  }
+
+  companion object {
+    private const val PROGRESS_POLL_MS = 250L
   }
 }

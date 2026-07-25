@@ -49,7 +49,24 @@ class AppUpdateRepository @Inject constructor(
   }
 
   suspend fun fetchLatestUpdate(): AppUpdateInfo? = withContext(Dispatchers.IO) {
-    fetchFromFirestore() ?: fetchFromGitHubLatest()
+    val firestore = fetchFromFirestore()
+    val github = fetchFromGitHubLatest()
+    selectNewest(firestore, github)
+  }
+
+  /**
+   * Prefer the higher versionCode so a stale Firestore doc cannot hide a newer GitHub release
+   * (and vice versa). On a tie, prefer the candidate that still has an apkUrl.
+   */
+  internal fun selectNewest(a: AppUpdateInfo?, b: AppUpdateInfo?): AppUpdateInfo? {
+    if (a == null) return b
+    if (b == null) return a
+    return when {
+      a.versionCode > b.versionCode -> a
+      b.versionCode > a.versionCode -> b
+      a.apkUrl.isNotBlank() -> a
+      else -> b
+    }
   }
 
   private suspend fun fetchFromFirestore(): AppUpdateInfo? {

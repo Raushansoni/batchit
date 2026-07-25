@@ -17,17 +17,32 @@
 package io.getstream.whatsappclone.update
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.getstream.whatsappclone.R
+import io.getstream.whatsappclone.designsystem.theme.GREEN450
+import java.util.Locale
 
 @Composable
 fun AppUpdateHost(
@@ -37,11 +52,22 @@ fun AppUpdateHost(
   val activity = LocalContext.current as ComponentActivity
   val resolvedViewModel = viewModel ?: hiltViewModel(activity)
   val state by resolvedViewModel.uiState.collectAsStateWithLifecycle()
+  val lifecycleOwner = LocalLifecycleOwner.current
 
   LaunchedEffect(enabled) {
     if (enabled) {
       resolvedViewModel.checkForUpdate(userInitiated = false)
     }
+  }
+
+  DisposableEffect(lifecycleOwner, resolvedViewModel) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) {
+        resolvedViewModel.onHostResumed()
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
   }
 
   when (val s = state) {
@@ -96,12 +122,34 @@ fun AppUpdateHost(
         onDismissRequest = {},
         title = { Text(text = stringResource(R.string.update_downloading_title)) },
         text = {
-          Text(
-            text = stringResource(
-              R.string.update_downloading_message,
-              s.info.versionName
+          Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+              text = stringResource(
+                R.string.update_downloading_message,
+                s.info.versionName
+              )
             )
-          )
+            if (s.totalBytes > 0L) {
+              LinearProgressIndicator(
+                progress = { s.progress },
+                modifier = Modifier.fillMaxWidth(),
+                color = GREEN450,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+              )
+            } else {
+              LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = GREEN450,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+              )
+            }
+            Spacer(modifier = Modifier.height(0.dp))
+            Text(
+              text = formatDownloadProgress(s.downloadedBytes, s.totalBytes, s.progress),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
         },
         confirmButton = {}
       )
@@ -112,15 +160,13 @@ fun AppUpdateHost(
         onDismissRequest = {
           if (!s.info.forceUpdate) resolvedViewModel.dismiss()
         },
-        title = { Text(text = "Update ready") },
+        title = { Text(text = stringResource(R.string.update_ready_title)) },
         text = {
-          Text(
-            text = "The update has downloaded. Tap Install to continue with Android's installer."
-          )
+          Text(text = stringResource(R.string.update_ready_message))
         },
         confirmButton = {
           TextButton(onClick = { resolvedViewModel.installApk(s.file) }) {
-            Text(text = "Install")
+            Text(text = stringResource(R.string.update_install))
           }
         },
         dismissButton = {
@@ -161,4 +207,29 @@ fun AppUpdateHost(
 
     else -> Unit
   }
+}
+
+private fun formatDownloadProgress(downloaded: Long, total: Long, progress: Float): String {
+  return if (total > 0L) {
+    val percent = (progress * 100f).toInt().coerceIn(0, 100)
+    String.format(
+      Locale.US,
+      "%d%% · %s / %s",
+      percent,
+      formatBytes(downloaded),
+      formatBytes(total)
+    )
+  } else if (downloaded > 0L) {
+    formatBytes(downloaded)
+  } else {
+    "Starting…"
+  }
+}
+
+private fun formatBytes(bytes: Long): String {
+  if (bytes < 1024) return "$bytes B"
+  val kb = bytes / 1024.0
+  if (kb < 1024) return String.format(Locale.US, "%.1f KB", kb)
+  val mb = kb / 1024.0
+  return String.format(Locale.US, "%.1f MB", mb)
 }

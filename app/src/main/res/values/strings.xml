@@ -34,7 +34,10 @@
   <string name="update_up_to_date_title">You\'re up to date</string>
   <string name="update_up_to_date_message">You already have the latest version of BatchIt.</string>
   <string name="update_downloading_title">Downloading update</string>
-  <string name="update_downloading_message">Downloading BatchIt %1$s. You will be prompted to install when it finishes.</string>
+  <string name="update_downloading_message">Downloading BatchIt %1$s…</string>
+  <string name="update_ready_title">Update ready</string>
+  <string name="update_ready_message">The update has downloaded. Tap Install to continue with Android\'s installer.</string>
+  <string name="update_install">Install</string>
   <string name="update_error_title">Update failed</string>
 
   <string name="notification_channel_messages">Messages</string>
