@@ -31,9 +31,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.video.android.compose.theme.VideoTheme
+import io.getstream.video.android.compose.ui.components.call.controls.actions.DefaultOnCallActionHandler
 import io.getstream.video.android.compose.ui.components.call.ringing.RingingCallContent
 import io.getstream.video.android.core.Call
 import io.getstream.video.android.core.StreamVideo
+import io.getstream.video.android.core.call.state.AcceptCall
+import io.getstream.video.android.core.call.state.CancelCall
+import io.getstream.video.android.core.call.state.DeclineCall
 import io.getstream.whatsappclone.data.repository.CallHistoryRepository
 import io.getstream.whatsappclone.model.CallRecord
 import javax.inject.Inject
@@ -102,7 +106,12 @@ fun IncomingCallOverlay(
   val ringingCall by videoClient.state.ringingCall.collectAsStateWithLifecycle()
   val call = ringingCall ?: return
   val scope = rememberCoroutineScope()
-  val isVideo = call.state.settings.value?.video?.enabled != false
+  val custom by call.state.custom.collectAsStateWithLifecycle()
+  val settings by call.state.settings.collectAsStateWithLifecycle()
+  val isVideo = remember(custom, settings) {
+    resolveIsVideoCall(custom = custom, settings = settings)
+  }
+  var acceptHandled by remember(call.id) { mutableStateOf(false) }
 
   VideoTheme {
     RingingCallContent(
@@ -112,8 +121,27 @@ fun IncomingCallOverlay(
       onBackPressed = {
         scope.launch { viewModel.reject(call, isVideo) }
       },
+      onCallAction = { action ->
+        when (action) {
+          AcceptCall -> {
+            if (acceptHandled) return@RingingCallContent
+            acceptHandled = true
+            viewModel.accept(call, isVideo) { joined ->
+              onCallConnected(joined.id, isVideo)
+            }
+          }
+          DeclineCall, CancelCall -> {
+            scope.launch { viewModel.reject(call, isVideo) }
+          }
+          else -> DefaultOnCallActionHandler.onCallAction(call, action)
+        }
+      },
       onAcceptedContent = {
+        // Covers accept paths that flip RingingState.Active without our AcceptCall handler
+        // (e.g. notification accept while overlay is still composed).
         LaunchedEffect(call.id) {
+          if (acceptHandled) return@LaunchedEffect
+          acceptHandled = true
           viewModel.accept(call, isVideo) { joined ->
             onCallConnected(joined.id, isVideo)
           }

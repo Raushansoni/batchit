@@ -65,9 +65,18 @@ class AuthViewModel @Inject constructor(
                 ?: "Could not restore session. Check your Stream API key in secrets.properties."
             )
           }
-      } else {
+        return@launch
+      }
+
+      // Returning users: show home immediately while Stream reconnects in the background.
+      val canShowShellEarly = Firebase.auth.currentUser != null &&
+        authRepository.isSessionActive() &&
+        authRepository.hasUsername() &&
+        authRepository.hasPromptedPermissions()
+
+      if (canShowShellEarly) {
+        _uiState.value = AuthUiState.Authenticated
         authRepository.restoreFirebaseSession()
-          .onSuccess { _uiState.value = nextOnboardingState() }
           .onFailure { error ->
             authRepository.signOut()
             _uiState.value = AuthUiState.Error(
@@ -75,7 +84,18 @@ class AuthViewModel @Inject constructor(
                 ?: "Could not restore session. Deploy the token Worker and check STREAM_TOKEN_URL."
             )
           }
+        return@launch
       }
+
+      authRepository.restoreFirebaseSession()
+        .onSuccess { _uiState.value = nextOnboardingState() }
+        .onFailure { error ->
+          authRepository.signOut()
+          _uiState.value = AuthUiState.Error(
+            error.message
+              ?: "Could not restore session. Deploy the token Worker and check STREAM_TOKEN_URL."
+          )
+        }
     }
 
     viewModelScope.launch {

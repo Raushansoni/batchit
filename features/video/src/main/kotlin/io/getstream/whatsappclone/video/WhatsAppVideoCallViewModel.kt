@@ -28,9 +28,13 @@ import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
 import io.getstream.whatsappclone.uistate.WhatsAppVideoUiState
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import org.openapitools.client.models.AudioSettingsRequest
+import org.openapitools.client.models.CallSettingsRequest
+import org.openapitools.client.models.VideoSettingsRequest
 
 @HiltViewModel
 class WhatsAppVideoCallViewModel @Inject constructor(
@@ -55,7 +59,14 @@ class WhatsAppVideoCallViewModel @Inject constructor(
 
   fun joinCall(type: String, id: String) {
     viewModelScope.launch {
-      val streamVideo = runCatching { StreamVideo.instance() }.getOrNull()
+      // Video SDK may still be connecting after chat (deferred on cold start).
+      var streamVideo = runCatching { StreamVideo.instance() }.getOrNull()
+      var attempts = 0
+      while (streamVideo == null && attempts < 20) {
+        delay(250)
+        streamVideo = runCatching { StreamVideo.instance() }.getOrNull()
+        attempts++
+      }
       if (streamVideo == null) {
         videoMutableUiState.value = WhatsAppVideoUiState.Error
         return@launch
@@ -68,6 +79,7 @@ class WhatsAppVideoCallViewModel @Inject constructor(
           streamVideo.call(type = type, id = id)
         } else {
           // Already joined (e.g. accept from ringing overlay / notification).
+          applyLocalMediaDefaults(activeCall)
           recordHistory(activeCall, outgoing = memberIds.isNotEmpty())
           videoMutableUiState.value = WhatsAppVideoUiState.Success(activeCall)
           return@launch
@@ -79,17 +91,36 @@ class WhatsAppVideoCallViewModel @Inject constructor(
       if (memberIds.isNotEmpty()) {
         val me = streamVideo.user.id
         val allMembers = (memberIds + me).distinct()
-        val createResult = call.create(memberIds = allMembers, ring = true)
+        val createResult = call.create(
+          memberIds = allMembers,
+          ring = true,
+          custom = mapOf(CALL_CUSTOM_IS_VIDEO to isVideoCall),
+          settings = CallSettingsRequest(
+            audio = AudioSettingsRequest(
+              defaultDevice = AudioSettingsRequest.DefaultDevice.Speaker,
+              speakerDefaultOn = true,
+              micDefaultOn = true
+            ),
+            video = VideoSettingsRequest(
+              enabled = isVideoCall,
+              cameraDefaultOn = isVideoCall
+            )
+          )
+        )
         if (createResult.isFailure) {
           videoMutableUiState.value = WhatsAppVideoUiState.Error
           return@launch
         }
       }
 
+      // Apply camera/speaker before join so ringing/join media matches call type.
+      applyLocalMediaDefaults(call)
+
       // Incoming / rejoin must not create a new call — that breaks accept flows.
       val result = call.join(create = false)
 
       result.onSuccess {
+        applyLocalMediaDefaults(call)
         recordHistory(call, outgoing = memberIds.isNotEmpty())
         videoMutableUiState.value = WhatsAppVideoUiState.Success(call)
       }.onError {
@@ -98,10 +129,16 @@ class WhatsAppVideoCallViewModel @Inject constructor(
     }
   }
 
+  private fun applyLocalMediaDefaults(call: Call) {
+    runCatching { call.camera.setEnabled(isVideoCall) }
+    runCatching { call.speaker.setEnabled(true) }
+  }
+
   fun acceptIncoming(call: Call) {
     viewModelScope.launch {
       val result = call.join()
       result.onSuccess {
+        applyLocalMediaDefaults(call)
         recordHistory(call, outgoing = false)
         videoMutableUiState.value = WhatsAppVideoUiState.Success(call)
       }.onError {

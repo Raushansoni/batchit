@@ -80,8 +80,11 @@ class AuthRepository @Inject constructor(
   suspend fun restoreFirebaseSession(): Result<Unit> = runCatching {
     val user = Firebase.auth.currentUser
       ?: error("No Firebase session. Please sign in again.")
-    upsertAuthUserProfile()
-    connectStreamForCurrentFirebaseUser(preferredName = getCachedUsername() ?: user.displayName)
+    // Skip blocking Firestore upsert on cold start; profile sync is not required to open home.
+    connectStreamForCurrentFirebaseUser(
+      preferredName = getCachedUsername() ?: user.displayName,
+      preferCachedToken = true
+    )
     setLoggedIn(true)
   }
 
@@ -316,11 +319,12 @@ class AuthRepository @Inject constructor(
     }
   }
 
-  private suspend fun connectStreamForCurrentFirebaseUser(preferredName: String? = null) {
+  private suspend fun connectStreamForCurrentFirebaseUser(
+    preferredName: String? = null,
+    preferCachedToken: Boolean = false
+  ) {
     val firebaseUser = Firebase.auth.currentUser
       ?: error("Firebase user missing")
-    val idToken = firebaseUser.getIdToken(false).awaitTask().token
-      ?: error("Could not get Firebase ID token")
 
     val name = preferredName
       ?: getCachedUsername()
@@ -329,6 +333,30 @@ class AuthRepository @Inject constructor(
       ?: firebaseUser.email?.substringBefore("@")
       ?: "BatchIt User"
     val image = firebaseUser.photoUrl?.toString().orEmpty()
+
+    val tokenRefresher: () -> String = {
+      runBlocking {
+        val fresh = Firebase.auth.currentUser?.getIdToken(true)?.awaitTask()?.token
+          ?: error("Missing Firebase ID token for refresh")
+        streamTokenClient.mintToken(fresh, name, image).token
+      }
+    }
+
+    val cached = streamSessionManager.getPersistedSession()
+    if (preferCachedToken && cached != null && cached.userId == firebaseUser.uid) {
+      streamSessionManager.connectWithFirebaseToken(
+        chatClient = chatClient,
+        userId = cached.userId,
+        name = name.ifBlank { cached.name },
+        image = image.ifBlank { cached.image },
+        token = cached.token,
+        tokenRefresher = tokenRefresher
+      )
+      return
+    }
+
+    val idToken = firebaseUser.getIdToken(false).awaitTask().token
+      ?: error("Could not get Firebase ID token")
 
     val payload = streamTokenClient.mintToken(
       firebaseIdToken = idToken,
@@ -342,13 +370,7 @@ class AuthRepository @Inject constructor(
       name = payload.name,
       image = payload.image,
       token = payload.token,
-      tokenRefresher = {
-        runBlocking {
-          val fresh = Firebase.auth.currentUser?.getIdToken(true)?.awaitTask()?.token
-            ?: error("Missing Firebase ID token for refresh")
-          streamTokenClient.mintToken(fresh, name, image).token
-        }
-      }
+      tokenRefresher = tokenRefresher
     )
   }
 

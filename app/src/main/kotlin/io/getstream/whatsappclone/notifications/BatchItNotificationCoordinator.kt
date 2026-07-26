@@ -26,6 +26,7 @@ import io.getstream.log.streamLog
 import io.getstream.video.android.core.StreamVideo
 import io.getstream.whatsappclone.data.repository.CallHistoryRepository
 import io.getstream.whatsappclone.settings.SettingsRepository
+import io.getstream.whatsappclone.video.resolveIsVideoCall
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -173,7 +174,7 @@ class BatchItNotificationCoordinator @Inject constructor(
 
           val me = runCatching { video.user.id }.getOrNull().orEmpty()
           val peer = call.state.members.value.map { it.user }.firstOrNull { it.id != me }
-          val isVideo = call.state.settings.value?.video?.enabled != false
+          val isVideo = call.resolveIsVideoCall()
 
           notifier.showIncomingCallNotification(
             callId = callId,
