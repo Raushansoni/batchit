@@ -34,3 +34,10 @@
 -keep class io.getstream.whatsappclone.settings.** { *; }
 -keep class io.getstream.whatsappclone.auth.** { *; }
 -keep class io.getstream.whatsappclone.status.model.** { *; }
+
+# Credential Manager / Sign in with Google (release minify)
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+-keep class com.google.android.gms.auth.** { *; }
+-dontwarn androidx.credentials.playservices.**

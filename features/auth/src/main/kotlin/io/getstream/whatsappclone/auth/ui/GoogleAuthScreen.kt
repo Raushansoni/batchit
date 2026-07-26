@@ -69,13 +69,13 @@ fun GoogleAuthScreen(
   val credentialManager = remember { CredentialManager.create(context) }
 
   fun launchGoogleSignIn() {
-    val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
-    if (webClientId.isBlank() || webClientId == "REPLACE_ME") {
-      onError("Set GOOGLE_WEB_CLIENT_ID in secrets.properties (Web client ID from Firebase).")
-      return
-    }
     if (activity == null) {
       onError("Google sign-in needs an Activity context.")
+      return
+    }
+    val webClientId = resolveWebClientId(activity)
+    if (webClientId.isBlank() || webClientId == "REPLACE_ME") {
+      onError("Set GOOGLE_WEB_CLIENT_ID in secrets.properties (Web client ID from Firebase).")
       return
     }
 
@@ -91,7 +91,7 @@ fun GoogleAuthScreen(
       } catch (cancelled: GetCredentialCancellationException) {
         onCancelled()
       } catch (error: Throwable) {
-        onError(error.message ?: "Google sign-in failed")
+        onError(humanizeGoogleSignInError(error))
       }
     }
   }
@@ -143,30 +143,58 @@ fun GoogleAuthScreen(
   }
 }
 
+/**
+ * Prefer the Web client ID baked in by google-services.json, then secrets.properties.
+ * Credential Manager must receive the *Web* client ID, not an Android client ID.
+ */
+private fun resolveWebClientId(activity: Activity): String {
+  val fromGoogleServices = runCatching {
+    val resId = activity.resources.getIdentifier(
+      "default_web_client_id",
+      "string",
+      activity.packageName
+    )
+    if (resId != 0) activity.getString(resId).trim() else ""
+  }.getOrDefault("")
+  if (fromGoogleServices.isNotBlank() && fromGoogleServices != "REPLACE_ME") {
+    return fromGoogleServices
+  }
+  return BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
+}
+
 private suspend fun requestGoogleIdToken(
   activity: Activity,
   credentialManager: CredentialManager,
   webClientId: String
 ): String {
+  // Explicit button flow first — matches "Continue with Google" and is more reliable
+  // than One Tap on misconfigured / freshly created OAuth brands.
   try {
-    val googleIdOption = GetGoogleIdOption.Builder()
-      .setFilterByAuthorizedAccounts(false)
-      .setServerClientId(webClientId)
-      .setAutoSelectEnabled(false)
-      .build()
-    val request = GetCredentialRequest.Builder()
-      .addCredentialOption(googleIdOption)
-      .build()
-    val result = credentialManager.getCredential(activity, request)
-    return extractGoogleIdToken(result.credential)
-  } catch (_: NoCredentialException) {
     val signInOption = GetSignInWithGoogleOption.Builder(webClientId).build()
     val request = GetCredentialRequest.Builder()
       .addCredentialOption(signInOption)
       .build()
     val result = credentialManager.getCredential(activity, request)
     return extractGoogleIdToken(result.credential)
+  } catch (error: Throwable) {
+    if (error is GetCredentialCancellationException || isDeveloperConsoleError(error)) {
+      throw error
+    }
+    if (error !is NoCredentialException) {
+      throw error
+    }
   }
+
+  val googleIdOption = GetGoogleIdOption.Builder()
+    .setFilterByAuthorizedAccounts(false)
+    .setServerClientId(webClientId)
+    .setAutoSelectEnabled(false)
+    .build()
+  val request = GetCredentialRequest.Builder()
+    .addCredentialOption(googleIdOption)
+    .build()
+  val result = credentialManager.getCredential(activity, request)
+  return extractGoogleIdToken(result.credential)
 }
 
 private fun extractGoogleIdToken(credential: androidx.credentials.Credential): String {
@@ -176,6 +204,22 @@ private fun extractGoogleIdToken(credential: androidx.credentials.Credential): S
     return GoogleIdTokenCredential.createFrom(credential.data).idToken
   }
   error("Unexpected credential type from Google Sign-In")
+}
+
+private fun isDeveloperConsoleError(error: Throwable): Boolean {
+  val raw = error.message.orEmpty()
+  return raw.contains("28444") ||
+    raw.contains("Developer console is not set up correctly", ignoreCase = true)
+}
+
+private fun humanizeGoogleSignInError(error: Throwable): String {
+  if (isDeveloperConsoleError(error)) {
+    return "Google Sign-In developer console error (28444). " +
+      "Confirm project batchit-prod (not jollypet): release SHA-1 is registered, " +
+      "OAuth consent/brand exists, and this APK was rebuilt after those changes. " +
+      "Use the Web client ID, not the Android client ID."
+  }
+  return error.message?.takeIf { it.isNotBlank() } ?: "Google sign-in failed"
 }
 
 @Preview
