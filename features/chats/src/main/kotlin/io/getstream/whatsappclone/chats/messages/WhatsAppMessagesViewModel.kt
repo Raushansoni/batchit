@@ -155,31 +155,31 @@ class WhatsAppMessagesViewModel @Inject constructor(
     }
   }
 
-fun showLocationPermissionDenied() {
+  fun showLocationPermissionDenied() {
     _actionMessage.value = "Location permission denied"
   }
 
   fun hasLocationPermission(): Boolean {
-  val fine = ContextCompat.checkSelfPermission(
-    context,
-    Manifest.permission.ACCESS_FINE_LOCATION
-  ) == PackageManager.PERMISSION_GRANTED
-  val coarse = ContextCompat.checkSelfPermission(
-    context,
-    Manifest.permission.ACCESS_COARSE_LOCATION
-  ) == PackageManager.PERMISSION_GRANTED
-  return fine || coarse
-}
+    val fine = ContextCompat.checkSelfPermission(
+      context,
+      Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    val coarse = ContextCompat.checkSelfPermission(
+      context,
+      Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    return fine || coarse
+  }
 
-private suspend fun getCurrentLocation(): Location? {
-  val client = LocationServices.getFusedLocationProviderClient(context)
-  val last = runCatching { client.lastLocation.awaitTask() }.getOrNull()
-  if (last != null) return last
-  val request = CurrentLocationRequest.Builder()
-    .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
-    .build()
-  return runCatching { client.getCurrentLocation(request, null).awaitTask() }.getOrNull()
-}
+  private suspend fun getCurrentLocation(): Location? {
+    val client = LocationServices.getFusedLocationProviderClient(context)
+    val last = runCatching { client.lastLocation.awaitTask() }.getOrNull()
+    if (last != null) return last
+    val request = CurrentLocationRequest.Builder()
+      .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+      .build()
+    return runCatching { client.getCurrentLocation(request, null).awaitTask() }.getOrNull()
+  }
 
   /**
    * Lightweight header fetch — do not call channel.watch() (MessagesScreen owns that).

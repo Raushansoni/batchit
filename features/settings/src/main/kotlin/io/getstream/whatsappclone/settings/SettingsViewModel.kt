@@ -16,10 +16,10 @@
 
 package io.getstream.whatsappclone.settings
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import android.net.Uri
 import io.getstream.whatsappclone.designsystem.theme.ThemeMode
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
