@@ -24,6 +24,16 @@ android {
   namespace = "io.getstream.whatsappclone.model"
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+  kotlinOptions {
+    freeCompilerArgs += listOf(
+      "-opt-in=com.google.accompanist.pager.ExperimentalPagerApi",
+      "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+      "-opt-in=androidx.lifecycle.compose.ExperimentalLifecycleComposeApi"
+    )
+  }
+}
+
 dependencies {
   api(libs.stream.chat.client)
   api(libs.stream.video.core)

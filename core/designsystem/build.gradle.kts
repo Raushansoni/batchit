@@ -23,6 +23,16 @@ android {
   namespace = "io.getstream.whatsappclone.designsystem"
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+  kotlinOptions {
+    freeCompilerArgs += listOf(
+      "-opt-in=com.google.accompanist.pager.ExperimentalPagerApi",
+      "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+      "-opt-in=androidx.lifecycle.compose.ExperimentalLifecycleComposeApi"
+    )
+  }
+}
+
 dependencies {
   // image loading
   api(libs.landscapist.glide)

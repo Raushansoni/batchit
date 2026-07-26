@@ -23,7 +23,11 @@ plugins {
 }
 
 android {
-    namespace = "io.getstream.whatsappclone.video"
+  namespace = "io.getstream.whatsappclone.video"
+
+  buildFeatures {
+    buildConfig = true
+  }
 }
 
 secrets {

@@ -24,6 +24,10 @@ plugins {
 
 android {
   namespace = "io.getstream.whatsappclone.auth"
+
+  buildFeatures {
+    buildConfig = true
+  }
 }
 
 secrets {

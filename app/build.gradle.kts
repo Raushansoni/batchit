@@ -46,6 +46,10 @@ val hasReleaseSigning = listOf(
 android {
   namespace = "io.getstream.whatsappclone"
 
+  buildFeatures {
+    buildConfig = true
+  }
+
   defaultConfig {
     applicationId = "com.batchit.app"
     minSdk = Configurations.minSdk
