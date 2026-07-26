@@ -76,7 +76,7 @@ class StreamSessionManager @Inject constructor(
     val existing = chatClient.getCurrentUser()
     if (existing?.id == DEMO_USER_ID) {
       cachedToken = chatClient.devToken(DEMO_USER_ID)
-      scheduleVideoConnect(
+      awaitVideoConnect(
         userId = existing.id,
         name = existing.name,
         image = existing.image,
@@ -101,7 +101,7 @@ class StreamSessionManager @Inject constructor(
     }
     streamLog { "Demo chat user connected" }
 
-    scheduleVideoConnect(
+    awaitVideoConnect(
       userId = user.id,
       name = user.name,
       image = user.image,
@@ -124,7 +124,7 @@ class StreamSessionManager @Inject constructor(
     val existing = chatClient.getCurrentUser()
     if (existing?.id == userId) {
       streamLog { "Firebase chat user already connected: $userId" }
-      scheduleVideoConnect(userId = userId, name = name, image = image, token = token)
+      awaitVideoConnect(userId = userId, name = name, image = image, token = token)
       return
     }
 
@@ -153,15 +153,20 @@ class StreamSessionManager @Inject constructor(
     }
     streamLog { "Firebase chat user connected: $userId" }
 
-    // Chat is enough for the home shell; Video connects right after on a background job.
-    scheduleVideoConnect(userId = userId, name = name, image = image, token = token)
+    // Chat first (required for home); Video must be ready before returning so calls work.
+    awaitVideoConnect(userId = userId, name = name, image = image, token = token)
   }
 
   /** Ensures Stream Video is ready (e.g. before placing/receiving a call). */
   suspend fun ensureVideoConnected() {
     val pending = pendingVideoUser
-    val token = cachedToken ?: getPersistedSession()?.token
-    if (pending != null && token != null) {
+    if (pending != null) {
+      val token = resolveVideoToken(
+        userId = pending.id,
+        name = pending.name.orEmpty(),
+        image = pending.image.orEmpty(),
+        fallback = cachedToken ?: getPersistedSession()?.token
+      ) ?: return
       connectVideo(
         userId = pending.id,
         name = pending.name.orEmpty(),
@@ -171,11 +176,17 @@ class StreamSessionManager @Inject constructor(
       return
     }
     val session = getPersistedSession() ?: return
+    val token = resolveVideoToken(
+      userId = session.userId,
+      name = session.name,
+      image = session.image,
+      fallback = session.token
+    ) ?: return
     connectVideo(
       userId = session.userId,
       name = session.name,
       image = session.image,
-      token = session.token
+      token = token
     )
   }
 
@@ -192,6 +203,21 @@ class StreamSessionManager @Inject constructor(
     }
   }
 
+  private suspend fun awaitVideoConnect(
+    userId: String,
+    name: String,
+    image: String,
+    token: String
+  ) {
+    pendingVideoUser = VideoUser(
+      id = userId,
+      name = name,
+      image = image,
+      role = "user"
+    )
+    connectVideo(userId = userId, name = name, image = image, token = token)
+  }
+
   private fun scheduleVideoConnect(userId: String, name: String, image: String, token: String) {
     pendingVideoUser = VideoUser(
       id = userId,
@@ -202,6 +228,24 @@ class StreamSessionManager @Inject constructor(
     scope.launch {
       connectVideo(userId = userId, name = name, image = image, token = token)
     }
+  }
+
+  private fun resolveVideoToken(
+    userId: String,
+    name: String,
+    image: String,
+    fallback: String?
+  ): String? {
+    val refreshed = try {
+      tokenRefresher?.invoke()?.also { fresh ->
+        cachedToken = fresh
+        persistSession(userId = userId, name = name, image = image, token = fresh)
+      }
+    } catch (error: Throwable) {
+      streamLog { "Video token refresh failed: ${error.message}" }
+      null
+    }
+    return refreshed ?: fallback ?: cachedToken
   }
 
   private suspend fun connectVideo(userId: String, name: String, image: String, token: String) {
@@ -242,6 +286,7 @@ class StreamSessionManager @Inject constructor(
           notificationConfig = notificationConfig
         ).build()
         pendingVideoUser = null
+        cachedToken = token
         streamLog { "StreamVideo connected for $userId" }
       } catch (error: Throwable) {
         // Keep chat usable; calls will fail until the next successful reconnect.

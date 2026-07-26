@@ -31,7 +31,7 @@ fun resolveIsVideoCall(
   }
   val video = settings?.video ?: return true
   // Prefer cameraDefaultOn — enabled alone is often true for the call type even on audio.
-  return video.cameraDefaultOn
+  return video.cameraDefaultOn ?: true
 }
 
 fun Call.resolveIsVideoCall(): Boolean =

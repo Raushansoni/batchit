@@ -68,25 +68,8 @@ class AuthViewModel @Inject constructor(
         return@launch
       }
 
-      // Returning users: show home immediately while Stream reconnects in the background.
-      val canShowShellEarly = Firebase.auth.currentUser != null &&
-        authRepository.isSessionActive() &&
-        authRepository.hasUsername() &&
-        authRepository.hasPromptedPermissions()
-
-      if (canShowShellEarly) {
-        _uiState.value = AuthUiState.Authenticated
-        authRepository.restoreFirebaseSession()
-          .onFailure { error ->
-            authRepository.signOut()
-            _uiState.value = AuthUiState.Error(
-              error.message
-                ?: "Could not restore session. Deploy the token Worker and check STREAM_TOKEN_URL."
-            )
-          }
-        return@launch
-      }
-
+      // Must finish ChatClient.connectUser before Authenticated — ChannelListViewModel
+      // crashes if the shell opens earlier. Cached JWT still speeds restore.
       authRepository.restoreFirebaseSession()
         .onSuccess { _uiState.value = nextOnboardingState() }
         .onFailure { error ->

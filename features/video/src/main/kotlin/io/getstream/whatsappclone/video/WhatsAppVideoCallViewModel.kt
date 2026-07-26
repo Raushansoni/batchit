@@ -91,7 +91,7 @@ class WhatsAppVideoCallViewModel @Inject constructor(
       if (memberIds.isNotEmpty()) {
         val me = streamVideo.user.id
         val allMembers = (memberIds + me).distinct()
-        val createResult = call.create(
+        var createResult = call.create(
           memberIds = allMembers,
           ring = true,
           custom = mapOf(CALL_CUSTOM_IS_VIDEO to isVideoCall),
@@ -107,6 +107,14 @@ class WhatsAppVideoCallViewModel @Inject constructor(
             )
           )
         )
+        if (createResult.isFailure) {
+          // Some Stream projects reject override settings; still create with custom flag.
+          createResult = call.create(
+            memberIds = allMembers,
+            ring = true,
+            custom = mapOf(CALL_CUSTOM_IS_VIDEO to isVideoCall)
+          )
+        }
         if (createResult.isFailure) {
           videoMutableUiState.value = WhatsAppVideoUiState.Error
           return@launch
