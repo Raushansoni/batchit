@@ -26,6 +26,7 @@ import io.getstream.log.streamLog
 import io.getstream.video.android.core.StreamVideo
 import io.getstream.video.android.core.StreamVideoBuilder
 import io.getstream.video.android.core.notifications.NotificationConfig
+import io.getstream.video.android.core.sounds.Sounds
 import io.getstream.video.android.model.User as VideoUser
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -273,6 +274,17 @@ class StreamSessionManager @Inject constructor(
           requestPermissionOnAppLaunch = { false }
         )
 
+        val incomingSound = context.resources.getIdentifier(
+          "call_incoming_sound",
+          "raw",
+          context.packageName
+        ).takeIf { it != 0 }
+        val outgoingSound = context.resources.getIdentifier(
+          "call_outgoing_sound",
+          "raw",
+          context.packageName
+        ).takeIf { it != 0 }
+
         StreamVideoBuilder(
           context = context,
           apiKey = BuildConfig.STREAM_API_KEY,
@@ -283,7 +295,12 @@ class StreamSessionManager @Inject constructor(
             image = image,
             role = "user"
           ),
-          notificationConfig = notificationConfig
+          notificationConfig = notificationConfig,
+          sounds = Sounds(
+            incomingCallSound = incomingSound,
+            outgoingCallSound = outgoingSound
+          ),
+          runForegroundServiceForCalls = true
         ).build()
         pendingVideoUser = null
         cachedToken = token

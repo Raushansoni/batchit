@@ -23,6 +23,7 @@ import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.client.events.NewMessageEvent
 import io.getstream.chat.android.client.utils.observable.Disposable
 import io.getstream.log.streamLog
+import io.getstream.video.android.core.RingingState
 import io.getstream.video.android.core.StreamVideo
 import io.getstream.whatsappclone.data.repository.CallHistoryRepository
 import io.getstream.whatsappclone.settings.SettingsRepository
@@ -169,10 +170,14 @@ class BatchItNotificationCoordinator @Inject constructor(
           if (callId == lastRingingCallId) return@collectLatest
           lastRingingCallId = callId
 
+          val me = runCatching { video.user.id }.getOrNull().orEmpty()
+          val ringingState = call.state.ringingState.value
+          val createdById = call.state.createdBy.value?.id
+          if (ringingState is RingingState.Outgoing || createdById == me) return@collectLatest
+
           // Foreground overlay already covers the ringing UI; still notify when backgrounded.
           if (appInForeground.value) return@collectLatest
 
-          val me = runCatching { video.user.id }.getOrNull().orEmpty()
           val peer = call.state.members.value.map { it.user }.firstOrNull { it.id != me }
           val isVideo = call.resolveIsVideoCall()
 

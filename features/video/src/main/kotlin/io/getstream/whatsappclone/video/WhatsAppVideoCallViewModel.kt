@@ -140,6 +140,11 @@ class WhatsAppVideoCallViewModel @Inject constructor(
         applyLocalMediaDefaults(call)
         recordHistory(call, outgoing = true)
         videoMutableUiState.value = WhatsAppVideoUiState.Success(call)
+        // Re-assert mic after SFU connects — first enable can race track publish.
+        viewModelScope.launch {
+          delay(350)
+          applyLocalMediaDefaults(call)
+        }
       }.onError {
         videoMutableUiState.value = WhatsAppVideoUiState.Error
       }
@@ -147,7 +152,7 @@ class WhatsAppVideoCallViewModel @Inject constructor(
   }
 
   private fun applyLocalMediaDefaults(call: Call) {
-    // WhatsApp: video → speaker; voice → earpiece.
+    // WhatsApp: video → speaker; voice → earpiece. Retry mic so SFU publish sticks.
     runCatching { call.camera.setEnabled(isVideoCall) }
     runCatching { call.speaker.setEnabled(isVideoCall) }
     runCatching { call.microphone.setEnabled(true) }

@@ -18,8 +18,10 @@ package io.getstream.whatsappclone.chats.theme
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import io.getstream.chat.android.compose.ui.attachments.StreamAttachmentFactories
 import io.getstream.chat.android.compose.ui.theme.ChatTheme
 import io.getstream.chat.android.compose.ui.theme.StreamColors
+import io.getstream.whatsappclone.chats.attachments.locationAttachmentFactory
 import io.getstream.whatsappclone.chats.reactions.WhatsAppCloneReactionFactory
 import io.getstream.whatsappclone.designsystem.theme.DARK_GREEN300
 import io.getstream.whatsappclone.designsystem.theme.GREEN200
@@ -54,10 +56,15 @@ fun WhatsAppChatTheme(
     }
   }
   val reactionFactory = remember { WhatsAppCloneReactionFactory() }
+  val attachmentFactories = remember {
+    listOf(locationAttachmentFactory()) + StreamAttachmentFactories.defaultFactories()
+  }
 
   ChatTheme(
+    isInDarkMode = darkTheme,
     colors = streamColors,
     reactionIconFactory = reactionFactory,
+    attachmentFactories = attachmentFactories,
     content = content
   )
 }

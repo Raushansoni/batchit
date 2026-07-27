@@ -38,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.getstream.video.android.core.Call
+import io.getstream.video.android.core.RingingState
 import io.getstream.video.android.core.StreamVideo
 import io.getstream.whatsappclone.data.repository.CallHistoryRepository
 import io.getstream.whatsappclone.model.CallRecord
@@ -58,12 +59,17 @@ class IncomingCallViewModel @Inject constructor(
         applyMediaDefaults(call, isVideo)
         record(call, outgoing = false, missed = false, isVideo = isVideo)
         onJoined(call)
+        launch {
+          delay(350)
+          applyMediaDefaults(call, isVideo)
+        }
       }.onError {
         // Still open the call screen if accept succeeded but join raced.
         val activeId = runCatching {
           StreamVideo.instance().state.activeCall.value?.id
         }.getOrNull()
         if (activeId == call.id) {
+          applyMediaDefaults(call, isVideo)
           onJoined(call)
         }
       }
@@ -123,6 +129,13 @@ fun IncomingCallOverlay(
   val ringingCall by videoClient.state.ringingCall.collectAsStateWithLifecycle()
   val call = ringingCall ?: return
 
+  val ringingState by call.state.ringingState.collectAsStateWithLifecycle()
+  val createdBy by call.state.createdBy.collectAsStateWithLifecycle()
+  val me = remember(videoClient) { videoClient.user.id }
+
+  // ringingCall is set for BOTH incoming and outgoing. Never show Accept/Decline for the caller.
+  if (ringingState is RingingState.Outgoing || createdBy?.id == me) return
+
   val custom by call.state.custom.collectAsStateWithLifecycle()
   val settings by call.state.settings.collectAsStateWithLifecycle()
   val members by call.state.members.collectAsStateWithLifecycle()
@@ -130,7 +143,6 @@ fun IncomingCallOverlay(
     resolveIsVideoCall(custom = custom, settings = settings)
   }
 
-  val me = remember(videoClient) { videoClient.user.id }
   val peer = remember(members, me) {
     resolveCallPeer(
       myId = me,
@@ -140,6 +152,8 @@ fun IncomingCallOverlay(
 
   var acceptHandled by remember(call.id) { mutableStateOf(false) }
   var busy by remember(call.id) { mutableStateOf(false) }
+
+  RememberCallRingtone(play = !busy, incoming = true)
 
   // Do NOT auto-join when activeCall appears — only Accept (or notification Accept) may connect.
 

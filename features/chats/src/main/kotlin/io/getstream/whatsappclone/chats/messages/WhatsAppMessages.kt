@@ -16,6 +16,8 @@
 
 package io.getstream.whatsappclone.chats.messages
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -102,13 +104,44 @@ fun WhatsAppMessages(
   }
 
   actionMessage?.let { message ->
+    val openLocation = message == WhatsAppMessagesViewModel.ACTION_OPEN_LOCATION
     AlertDialog(
       onDismissRequest = whatsAppMessagesViewModel::clearActionMessage,
-      text = { Text(text = message) },
+      text = {
+        Text(
+          text = if (openLocation) {
+            "Turn on location to share your position"
+          } else {
+            message
+          }
+        )
+      },
       confirmButton = {
-        TextButton(onClick = whatsAppMessagesViewModel::clearActionMessage) {
-          Text(text = stringResource(id = R.string.cancel))
+        if (openLocation) {
+          TextButton(
+            onClick = {
+              whatsAppMessagesViewModel.clearActionMessage()
+              runCatching {
+                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+              }
+            }
+          ) {
+            Text(text = "Open location")
+          }
+        } else {
+          TextButton(onClick = whatsAppMessagesViewModel::clearActionMessage) {
+            Text(text = stringResource(id = R.string.cancel))
+          }
         }
+      },
+      dismissButton = if (openLocation) {
+        {
+          TextButton(onClick = whatsAppMessagesViewModel::clearActionMessage) {
+            Text(text = stringResource(id = R.string.cancel))
+          }
+        }
+      } else {
+        null
       }
     )
   }

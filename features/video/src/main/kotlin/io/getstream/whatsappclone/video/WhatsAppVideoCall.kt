@@ -18,14 +18,11 @@ package io.getstream.whatsappclone.video
 
 import android.Manifest
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +50,13 @@ import io.getstream.video.android.compose.ui.components.avatar.UserAvatarBackgro
 import io.getstream.video.android.compose.ui.components.call.activecall.CallContent
 import io.getstream.video.android.compose.ui.components.video.VideoRenderer
 import io.getstream.video.android.core.Call
+import io.getstream.video.android.core.CameraDirection
 import io.getstream.video.android.core.StreamVideo
+import io.getstream.video.android.core.call.state.FlipCamera
+import io.getstream.video.android.core.call.state.LeaveCall
+import io.getstream.video.android.core.call.state.ToggleCamera
+import io.getstream.video.android.core.call.state.ToggleMicrophone
+import io.getstream.video.android.core.call.state.ToggleSpeakerphone
 import io.getstream.video.android.mock.StreamPreviewDataUtils
 import io.getstream.video.android.mock.previewCall
 import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator
@@ -143,6 +145,7 @@ private fun WhatsAppVideoCallContent(
   val isCameraEnabled by call.camera.isEnabled.collectAsStateWithLifecycle()
   val isMicrophoneEnabled by call.microphone.isEnabled.collectAsStateWithLifecycle()
   val isSpeakerphoneEnabled by call.speaker.isEnabled.collectAsStateWithLifecycle()
+  val cameraDirection by call.camera.direction.collectAsStateWithLifecycle()
 
   var connectedAt by remember(call.id) { mutableStateOf<Long?>(null) }
   var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -161,6 +164,18 @@ private fun WhatsAppVideoCallContent(
     }
   }
 
+  // Keep mic publishing after join — early enable can race SFU track setup.
+  LaunchedEffect(call.id, videoCall, remoteJoined) {
+    repeat(4) { attempt ->
+      runCatching {
+        call.microphone.setEnabled(true)
+        call.camera.setEnabled(videoCall)
+        call.speaker.setEnabled(videoCall)
+      }
+      if (attempt < 3) delay(400)
+    }
+  }
+
   DisposableEffect(call.id, videoCall) {
     call.camera.setEnabled(videoCall)
     call.speaker.setEnabled(videoCall)
@@ -173,6 +188,15 @@ private fun WhatsAppVideoCallContent(
     onBackPressed()
   }
 
+  fun flipCamera() {
+    runCatching {
+      if (!isCameraEnabled) {
+        call.camera.setEnabled(true)
+      }
+      call.camera.flip()
+    }
+  }
+
   BackHandler { leaveAndNavigateUp() }
 
   val statusText = when {
@@ -182,6 +206,11 @@ private fun WhatsAppVideoCallContent(
     else -> "Calling…"
   }
   val showRingingChrome = !remoteJoined || connectedAt == null
+
+  RememberCallRingtone(
+    play = showRingingChrome && isOutgoing && !remoteJoined,
+    incoming = false
+  )
 
   if (!videoCall || showRingingChrome) {
     // Voice call (always) and video pre-connect use WhatsApp avatar chrome.
@@ -220,9 +249,7 @@ private fun WhatsAppVideoCallContent(
                   call.camera.setEnabled(!isCameraEnabled)
                 }
               },
-              onFlipCamera = {
-                if (isCameraEnabled) call.camera.flip()
-              },
+              onFlipCamera = { flipCamera() },
               onEnd = { leaveAndNavigateUp() }
             )
           }
@@ -237,6 +264,16 @@ private fun WhatsAppVideoCallContent(
       CallContent(
         call = call,
         onBackPressed = { leaveAndNavigateUp() },
+        onCallAction = { action ->
+          when (action) {
+            is ToggleMicrophone -> call.microphone.setEnabled(action.isEnabled)
+            is ToggleCamera -> call.camera.setEnabled(action.isEnabled)
+            is ToggleSpeakerphone -> call.speaker.setEnabled(action.isEnabled)
+            is FlipCamera -> flipCamera()
+            is LeaveCall -> leaveAndNavigateUp()
+            else -> Unit
+          }
+        },
         appBarContent = {
           Column(
             modifier = Modifier
@@ -261,6 +298,15 @@ private fun WhatsAppVideoCallContent(
           val video by participant.video.collectAsStateWithLifecycle()
           val userName by participant.userNameOrId.collectAsStateWithLifecycle()
           val userImage by participant.image.collectAsStateWithLifecycle()
+          val mirrorLocal = participant.isLocal && cameraDirection == CameraDirection.Front
+          var localRenderer by remember(participant.sessionId) {
+            mutableStateOf<io.getstream.webrtc.android.ui.VideoTextureViewRenderer?>(null)
+          }
+          LaunchedEffect(mirrorLocal, localRenderer) {
+            localRenderer?.let { renderer ->
+              runCatching { renderer.setMirror(mirrorLocal) }
+            }
+          }
           Box(modifier = modifier.fillMaxSize()) {
             VideoRenderer(
               call = videoCallRef,
@@ -271,7 +317,8 @@ private fun WhatsAppVideoCallContent(
               },
               onRendered = { renderer ->
                 if (participant.isLocal) {
-                  runCatching { renderer.setMirror(false) }
+                  localRenderer = renderer
+                  runCatching { renderer.setMirror(mirrorLocal) }
                 }
               }
             )
@@ -286,9 +333,7 @@ private fun WhatsAppVideoCallContent(
             onToggleMute = { call.microphone.setEnabled(!isMicrophoneEnabled) },
             onToggleSpeaker = { call.speaker.setEnabled(!isSpeakerphoneEnabled) },
             onToggleCamera = { call.camera.setEnabled(!isCameraEnabled) },
-            onFlipCamera = {
-              if (isCameraEnabled) call.camera.flip()
-            },
+            onFlipCamera = { flipCamera() },
             onEnd = { leaveAndNavigateUp() }
           )
         }

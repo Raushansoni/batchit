@@ -38,6 +38,7 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+  <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
 
   <uses-feature
     android:name="android.hardware.camera"
@@ -65,6 +66,8 @@
       android:name=".MainActivity"
       android:exported="true"
       android:launchMode="singleTop"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
       android:theme="@style/Theme.WhatsAppCloneCompose"
       android:windowSoftInputMode="adjustResize">
       <intent-filter>
@@ -72,7 +75,24 @@
 
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <!-- Required so Stream CallService can build FGS notification PendingIntents.
+           Without these, CallService fails to start and mic/camera often never publish. -->
+      <intent-filter android:priority="1">
+        <action android:name="io.getstream.video.android.action.INCOMING_CALL" />
+        <action android:name="io.getstream.video.android.action.ONGOING_CALL" />
+        <action android:name="io.getstream.video.android.action.ACCEPT_CALL" />
+        <action android:name="io.getstream.video.android.action.OUTGOING_CALL" />
+        <action android:name="io.getstream.video.android.action.NOTIFICATION" />
+      </intent-filter>
     </activity>
+
+    <!-- Override SDK CallService types so Android 14+ allows mic + camera capture. -->
+    <service
+      android:name="io.getstream.video.android.core.notifications.internal.service.CallService"
+      android:exported="false"
+      android:foregroundServiceType="phoneCall|microphone|camera"
+      tools:node="merge"
+      tools:replace="android:foregroundServiceType" />
 
     <!--
          Receives Stream's data-only FCM messages while the app process is in

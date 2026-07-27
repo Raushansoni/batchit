@@ -20,6 +20,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -34,6 +35,7 @@ import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.client.api.models.QueryChannelRequest
 import io.getstream.chat.android.models.Attachment
 import io.getstream.chat.android.models.Message
+import io.getstream.whatsappclone.chats.attachments.LOCATION_ATTACHMENT_TYPE
 import io.getstream.whatsappclone.chats.starred.StarredMessagesStore
 import io.getstream.whatsappclone.navigation.AppComposeNavigator
 import io.getstream.whatsappclone.navigation.WhatsAppScreens
@@ -127,9 +129,17 @@ class WhatsAppMessagesViewModel @Inject constructor(
         _actionMessage.value = "Location permission needed to share a real location"
         return@launch
       }
+      if (!isLocationEnabled()) {
+        _actionMessage.value = ACTION_OPEN_LOCATION
+        return@launch
+      }
       val location = runCatching { getCurrentLocation() }.getOrNull()
       if (location == null) {
-        _actionMessage.value = "Could not get your location; try again"
+        _actionMessage.value = if (!isLocationEnabled()) {
+          ACTION_OPEN_LOCATION
+        } else {
+          "Could not get your location; try again"
+        }
         return@launch
       }
       val lat = location.latitude
@@ -137,16 +147,22 @@ class WhatsAppMessagesViewModel @Inject constructor(
       val mapsUrl = "https://www.google.com/maps?q=$lat,$lng"
       val staticMapUrl =
         "https://staticmap.openstreetmap.de/staticmap.php" +
-          "?center=$lat,$lng&zoom=16&size=400x200&markers=$lat,$lng,red-pushpin"
+          "?center=$lat,$lng&zoom=16&size=600x300&markers=$lat,$lng,red-pushpin"
 
       val attachment = Attachment(
-        type = "image",
+        type = LOCATION_ATTACHMENT_TYPE,
         imageUrl = staticMapUrl,
-        title = "Location",
-        titleLink = mapsUrl
+        title = "Shared location",
+        titleLink = mapsUrl,
+        text = "📍 Shared location",
+        extraData = mutableMapOf(
+          "latitude" to lat,
+          "longitude" to lng,
+          "maps_url" to mapsUrl
+        )
       )
       val message = Message(
-        text = "\uD83D\uDCCD Location\n$mapsUrl",
+        text = "",
         attachments = listOf(attachment)
       )
       chatClient.channel(cid).sendMessage(message).await()
@@ -169,6 +185,15 @@ class WhatsAppMessagesViewModel @Inject constructor(
       Manifest.permission.ACCESS_COARSE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
     return fine || coarse
+  }
+
+  fun isLocationEnabled(): Boolean {
+    val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+      ?: return false
+    return runCatching {
+      manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+        manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+    }.getOrDefault(false)
   }
 
   private suspend fun getCurrentLocation(): Location? {
@@ -194,6 +219,10 @@ class WhatsAppMessagesViewModel @Inject constructor(
         messageMutableUiState.value = WhatsAppMessageUiState.Error
       }
     }
+  }
+
+  companion object {
+    const val ACTION_OPEN_LOCATION = "__open_location__"
   }
 }
 
