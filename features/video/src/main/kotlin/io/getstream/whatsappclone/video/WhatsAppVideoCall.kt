@@ -17,23 +17,31 @@
 package io.getstream.whatsappclone.video
 
 import android.Manifest
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,27 +52,15 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.getstream.video.android.compose.theme.VideoTheme
 import io.getstream.video.android.compose.ui.components.avatar.UserAvatarBackground
 import io.getstream.video.android.compose.ui.components.call.activecall.CallContent
-import io.getstream.video.android.compose.ui.components.call.controls.ControlActions
-import io.getstream.video.android.compose.ui.components.call.controls.actions.DefaultOnCallActionHandler
-import io.getstream.video.android.compose.ui.components.call.controls.actions.FlipCameraAction
-import io.getstream.video.android.compose.ui.components.call.controls.actions.GenericAction
-import io.getstream.video.android.compose.ui.components.call.controls.actions.LeaveCallAction
-import io.getstream.video.android.compose.ui.components.call.controls.actions.ToggleCameraAction
-import io.getstream.video.android.compose.ui.components.call.controls.actions.ToggleMicrophoneAction
-import io.getstream.video.android.compose.ui.components.call.controls.actions.ToggleSpeakerphoneAction
-import io.getstream.video.android.compose.ui.components.call.renderer.ParticipantLabel
 import io.getstream.video.android.compose.ui.components.video.VideoRenderer
 import io.getstream.video.android.core.Call
-import io.getstream.video.android.core.call.state.FlipCamera
-import io.getstream.video.android.core.call.state.LeaveCall
-import io.getstream.video.android.core.call.state.ToggleCamera
-import io.getstream.video.android.core.call.state.ToggleMicrophone
-import io.getstream.video.android.core.call.state.ToggleSpeakerphone
-import io.getstream.video.android.core.mapper.ReactionMapper
+import io.getstream.video.android.core.StreamVideo
 import io.getstream.video.android.mock.StreamPreviewDataUtils
 import io.getstream.video.android.mock.previewCall
 import io.getstream.whatsappclone.designsystem.component.WhatsAppLoadingIndicator
 import io.getstream.whatsappclone.uistate.WhatsAppVideoUiState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @Composable
 fun WhatsAppVideoCall(
@@ -78,17 +74,49 @@ fun WhatsAppVideoCall(
     viewModel.joinCall(type = "default", id = id.replace(":", ""))
   }
 
-  when (uiState) {
+  when (val state = uiState) {
     is WhatsAppVideoUiState.Success ->
       WhatsAppVideoCallContent(
-        call = (uiState as WhatsAppVideoUiState.Success).data,
+        call = state.data,
         videoCall = videoCall,
+        isOutgoing = viewModel.isOutgoing,
         onBackPressed = { viewModel.navigateUp() }
       )
 
-    is WhatsAppVideoUiState.Error -> WhatsAppVideoCallError()
+    is WhatsAppVideoUiState.Error -> WhatsAppVideoCallError(onClose = { viewModel.navigateUp() })
 
-    else -> WhatsAppVideoLoading()
+    else -> WhatsAppConnectingScreen(
+      videoCall = videoCall,
+      onCancel = { viewModel.navigateUp() }
+    )
+  }
+}
+
+@Composable
+private fun WhatsAppConnectingScreen(
+  videoCall: Boolean,
+  onCancel: () -> Unit
+) {
+  BackHandler(onBack = onCancel)
+  WhatsAppCallBackground {
+    Box(modifier = Modifier.fillMaxSize()) {
+      WhatsAppCallPeerHeader(
+        name = if (videoCall) "Video call" else "Voice call",
+        status = "Connecting…",
+        imageUrl = null,
+        showPulse = true
+      )
+      WhatsAppLoadingIndicator(
+        modifier = Modifier.align(Alignment.Center)
+      )
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .align(Alignment.BottomCenter)
+      ) {
+        WhatsAppOutgoingActions(onEnd = onCancel)
+      }
+    }
   }
 }
 
@@ -96,22 +124,112 @@ fun WhatsAppVideoCall(
 private fun WhatsAppVideoCallContent(
   call: Call,
   videoCall: Boolean,
+  isOutgoing: Boolean,
   onBackPressed: () -> Unit
 ) {
+  val me = remember {
+    runCatching { StreamVideo.instance().user.id }.getOrNull().orEmpty()
+  }
+  val members by call.state.members.collectAsStateWithLifecycle()
+  val participants by call.state.participants.collectAsStateWithLifecycle()
+  val peer = remember(members, me) {
+    resolveCallPeer(
+      myId = me,
+      memberUsers = members.map { it.user }
+    )
+  }
+  val remoteJoined = participants.any { !it.isLocal }
+
   val isCameraEnabled by call.camera.isEnabled.collectAsStateWithLifecycle()
   val isMicrophoneEnabled by call.microphone.isEnabled.collectAsStateWithLifecycle()
   val isSpeakerphoneEnabled by call.speaker.isEnabled.collectAsStateWithLifecycle()
-  var isShowingReactionDialog by remember { mutableStateOf(false) }
 
-  DisposableEffect(key1 = call.id) {
+  var connectedAt by remember(call.id) { mutableStateOf<Long?>(null) }
+  var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+  LaunchedEffect(remoteJoined, call.id) {
+    if (remoteJoined && connectedAt == null) {
+      connectedAt = System.currentTimeMillis()
+    }
+  }
+
+  LaunchedEffect(connectedAt) {
+    if (connectedAt == null) return@LaunchedEffect
+    while (isActive) {
+      now = System.currentTimeMillis()
+      delay(1000)
+    }
+  }
+
+  DisposableEffect(call.id, videoCall) {
     call.camera.setEnabled(videoCall)
-    call.speaker.setEnabled(true)
-    onDispose { call.leave() }
+    call.speaker.setEnabled(videoCall)
+    call.microphone.setEnabled(true)
+    onDispose { runCatching { call.leave() } }
   }
 
   fun leaveAndNavigateUp() {
-    call.leave()
-    onBackPressed.invoke()
+    runCatching { call.leave() }
+    onBackPressed()
+  }
+
+  BackHandler { leaveAndNavigateUp() }
+
+  val statusText = when {
+    connectedAt != null -> formatCallDuration(now - (connectedAt ?: now))
+    isOutgoing && !remoteJoined -> "Ringing…"
+    !remoteJoined -> "Connecting…"
+    else -> "Calling…"
+  }
+  val showRingingChrome = !remoteJoined || connectedAt == null
+
+  if (!videoCall || showRingingChrome) {
+    // Voice call (always) and video pre-connect use WhatsApp avatar chrome.
+    WhatsAppCallBackground {
+      Box(modifier = Modifier.fillMaxSize()) {
+        WhatsAppCallPeerHeader(
+          name = peer?.name.orEmpty().ifBlank { peer?.id.orEmpty() },
+          status = statusText,
+          imageUrl = peer?.image?.takeIf { it.isNotBlank() },
+          showPulse = showRingingChrome
+        )
+
+        if (showRingingChrome && isOutgoing) {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .align(Alignment.BottomCenter)
+          ) {
+            WhatsAppOutgoingActions(onEnd = { leaveAndNavigateUp() })
+          }
+        } else {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .align(Alignment.BottomCenter)
+          ) {
+            WhatsAppInCallControls(
+              isVideoCall = videoCall,
+              isMuted = !isMicrophoneEnabled,
+              isSpeakerOn = isSpeakerphoneEnabled,
+              isCameraOn = isCameraEnabled,
+              onToggleMute = { call.microphone.setEnabled(!isMicrophoneEnabled) },
+              onToggleSpeaker = { call.speaker.setEnabled(!isSpeakerphoneEnabled) },
+              onToggleCamera = {
+                if (videoCall) {
+                  call.camera.setEnabled(!isCameraEnabled)
+                }
+              },
+              onFlipCamera = {
+                if (isCameraEnabled) call.camera.flip()
+              },
+              onEnd = { leaveAndNavigateUp() }
+            )
+          }
+        }
+      }
+    }
+    return
   }
 
   VideoTheme {
@@ -119,22 +237,27 @@ private fun WhatsAppVideoCallContent(
       CallContent(
         call = call,
         onBackPressed = { leaveAndNavigateUp() },
-        onCallAction = { action ->
-          when (action) {
-            LeaveCall -> leaveAndNavigateUp()
-            is ToggleSpeakerphone -> call.speaker.setEnabled(action.isEnabled)
-            is ToggleCamera -> call.camera.setEnabled(action.isEnabled)
-            is ToggleMicrophone -> call.microphone.setEnabled(action.isEnabled)
-            FlipCamera -> {
-              if (call.camera.isEnabled.value) {
-                call.camera.flip()
-              }
-            }
-            else -> DefaultOnCallActionHandler.onCallAction(call, action)
+        appBarContent = {
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(top = 40.dp, start = 16.dp, end = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+          ) {
+            Text(
+              text = peer?.name.orEmpty().ifBlank { peer?.id.orEmpty().ifBlank { "BatchIt call" } },
+              color = Color.White,
+              fontSize = 18.sp,
+              fontWeight = FontWeight.SemiBold
+            )
+            Text(
+              text = statusText,
+              color = CallSecondaryText,
+              fontSize = 13.sp
+            )
           }
         },
-        // Natural (non-mirrored) local preview — matches what the remote peer sees.
-        videoRenderer = { modifier, videoCallRef, participant, style ->
+        videoRenderer = { modifier, videoCallRef, participant, _ ->
           val video by participant.video.collectAsStateWithLifecycle()
           val userName by participant.userNameOrId.collectAsStateWithLifecycle()
           val userImage by participant.image.collectAsStateWithLifecycle()
@@ -152,98 +275,50 @@ private fun WhatsAppVideoCallContent(
                 }
               }
             )
-            if (style.isShowingParticipantLabel) {
-              ParticipantLabel(
-                call = videoCallRef,
-                participant = participant,
-                labelPosition = style.labelPosition
-              )
-            }
           }
         },
         controlsContent = {
-          ControlActions(
-            call = call,
-            actions = buildList {
-              add {
-                GenericAction(
-                  icon = ImageVector.vectorResource(
-                    id = io.getstream.video.android.ui.common.R.drawable.stream_video_ic_reaction
-                  ),
-                  modifier = Modifier.size(52.dp),
-                  onAction = { isShowingReactionDialog = true }
-                )
-              }
-              if (videoCall) {
-                add {
-                  ToggleCameraAction(
-                    modifier = Modifier.size(52.dp),
-                    isCameraEnabled = isCameraEnabled,
-                    onCallAction = { call.camera.setEnabled(it.isEnabled) }
-                  )
-                }
-              }
-              add {
-                ToggleMicrophoneAction(
-                  modifier = Modifier.size(52.dp),
-                  isMicrophoneEnabled = isMicrophoneEnabled,
-                  onCallAction = { call.microphone.setEnabled(it.isEnabled) }
-                )
-              }
-              add {
-                ToggleSpeakerphoneAction(
-                  modifier = Modifier.size(52.dp),
-                  isSpeakerphoneEnabled = isSpeakerphoneEnabled,
-                  onCallAction = { call.speaker.setEnabled(it.isEnabled) }
-                )
-              }
-              if (videoCall && isCameraEnabled) {
-                add {
-                  FlipCameraAction(
-                    modifier = Modifier.size(52.dp),
-                    onCallAction = { call.camera.flip() }
-                  )
-                }
-              }
-              add {
-                LeaveCallAction(
-                  modifier = Modifier.size(52.dp),
-                  onCallAction = { leaveAndNavigateUp() }
-                )
-              }
-            }
+          WhatsAppInCallControls(
+            isVideoCall = true,
+            isMuted = !isMicrophoneEnabled,
+            isSpeakerOn = isSpeakerphoneEnabled,
+            isCameraOn = isCameraEnabled,
+            onToggleMute = { call.microphone.setEnabled(!isMicrophoneEnabled) },
+            onToggleSpeaker = { call.speaker.setEnabled(!isSpeakerphoneEnabled) },
+            onToggleCamera = { call.camera.setEnabled(!isCameraEnabled) },
+            onFlipCamera = {
+              if (isCameraEnabled) call.camera.flip()
+            },
+            onEnd = { leaveAndNavigateUp() }
           )
         }
       )
-
-      if (isShowingReactionDialog) {
-        ReactionsMenu(
-          call = call,
-          reactionMapper = ReactionMapper.defaultReactionMapper(),
-          onDismiss = { isShowingReactionDialog = false }
-        )
-      }
     }
   }
 }
 
 @Composable
-private fun WhatsAppVideoCallError() {
-  Box(modifier = Modifier.fillMaxSize()) {
-    Text(
-      modifier = Modifier.align(Alignment.Center),
-      text = "Something went wrong; failed to join a call",
-      fontSize = 14.sp,
-      style = MaterialTheme.typography.bodyMedium,
-      color = MaterialTheme.colorScheme.onTertiary
-    )
-  }
-}
-
-@Composable
-private fun WhatsAppVideoLoading() {
-  Box(modifier = Modifier.fillMaxSize()) {
-    WhatsAppLoadingIndicator(modifier = Modifier.align(Alignment.Center))
+private fun WhatsAppVideoCallError(onClose: () -> Unit) {
+  BackHandler(onBack = onClose)
+  WhatsAppCallBackground {
+    Box(modifier = Modifier.fillMaxSize()) {
+      Text(
+        modifier = Modifier
+          .align(Alignment.Center)
+          .padding(24.dp),
+        text = "Couldn’t connect the call. Try again.",
+        fontSize = 15.sp,
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color.White
+      )
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .align(Alignment.BottomCenter)
+      ) {
+        WhatsAppOutgoingActions(onEnd = onClose)
+      }
+    }
   }
 }
 
@@ -251,12 +326,11 @@ private fun WhatsAppVideoLoading() {
 @Composable
 private fun WhatsAppVideoCallContentPreview() {
   StreamPreviewDataUtils.initializeStreamVideo(LocalContext.current)
-  VideoTheme {
-    WhatsAppVideoCallContent(
-      call = previewCall,
-      videoCall = true
-    ) {}
-  }
+  WhatsAppVideoCallContent(
+    call = previewCall,
+    videoCall = false,
+    isOutgoing = true
+  ) {}
 }
 
 @OptIn(ExperimentalPermissionsApi::class)

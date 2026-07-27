@@ -20,6 +20,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.getstream.log.streamLog
 import io.getstream.video.android.core.Call
 import io.getstream.video.android.core.StreamVideo
 import io.getstream.whatsappclone.data.repository.CallHistoryRepository
@@ -53,6 +54,9 @@ class WhatsAppVideoCallViewModel @Inject constructor(
   private val isVideoCall: Boolean =
     savedStateHandle.get<Boolean>(WhatsAppScreens.VideoCall.KEY_VIDEO_ID) ?: true
 
+  /** True when this screen placed the call (members passed in navigation). */
+  val isOutgoing: Boolean = memberIds.isNotEmpty()
+
   private val videoMutableUiState =
     MutableStateFlow<WhatsAppVideoUiState>(WhatsAppVideoUiState.Loading)
   val videoUiSate: StateFlow<WhatsAppVideoUiState> = videoMutableUiState
@@ -73,63 +77,68 @@ class WhatsAppVideoCallViewModel @Inject constructor(
       }
 
       val activeCall = streamVideo.state.activeCall.value
-      val call = if (activeCall != null) {
-        if (activeCall.id != id) {
-          activeCall.leave()
-          streamVideo.call(type = type, id = id)
-        } else {
-          // Already joined (e.g. accept from ringing overlay / notification).
-          applyLocalMediaDefaults(activeCall)
-          recordHistory(activeCall, outgoing = memberIds.isNotEmpty())
-          videoMutableUiState.value = WhatsAppVideoUiState.Success(activeCall)
-          return@launch
-        }
-      } else {
-        streamVideo.call(type = type, id = id)
+      if (activeCall != null && activeCall.id == id) {
+        // Already joined after an explicit Accept (overlay or notification action).
+        applyLocalMediaDefaults(activeCall)
+        recordHistory(activeCall, outgoing = memberIds.isNotEmpty())
+        videoMutableUiState.value = WhatsAppVideoUiState.Success(activeCall)
+        return@launch
       }
 
-      if (memberIds.isNotEmpty()) {
-        val me = streamVideo.user.id
-        val allMembers = (memberIds + me).distinct()
-        var createResult = call.create(
-          memberIds = allMembers,
-          ring = true,
-          custom = mapOf(CALL_CUSTOM_IS_VIDEO to isVideoCall),
-          settings = CallSettingsRequest(
-            audio = AudioSettingsRequest(
-              defaultDevice = AudioSettingsRequest.DefaultDevice.Speaker,
-              speakerDefaultOn = true,
-              micDefaultOn = true
-            ),
-            video = VideoSettingsRequest(
-              enabled = isVideoCall,
-              cameraDefaultOn = isVideoCall
-            )
+      // Incoming path (no members): never join/accept here — wait for the responder.
+      if (memberIds.isEmpty()) {
+        streamLog { "Skip auto-join for incoming call $id — waiting for Accept" }
+        composeNavigator.navigateUp()
+        return@launch
+      }
+
+      if (activeCall != null && activeCall.id != id) {
+        activeCall.leave()
+      }
+
+      val call = streamVideo.call(type = type, id = id)
+      val me = streamVideo.user.id
+      val allMembers = (memberIds + me).distinct()
+      var createResult = call.create(
+        memberIds = allMembers,
+        ring = true,
+        custom = mapOf(CALL_CUSTOM_IS_VIDEO to isVideoCall),
+        settings = CallSettingsRequest(
+          audio = AudioSettingsRequest(
+            defaultDevice = if (isVideoCall) {
+              AudioSettingsRequest.DefaultDevice.Speaker
+            } else {
+              AudioSettingsRequest.DefaultDevice.Earpiece
+            },
+            speakerDefaultOn = isVideoCall,
+            micDefaultOn = true
+          ),
+          video = VideoSettingsRequest(
+            enabled = isVideoCall,
+            cameraDefaultOn = isVideoCall
           )
         )
-        if (createResult.isFailure) {
-          // Some Stream projects reject override settings; still create with custom flag.
-          createResult = call.create(
-            memberIds = allMembers,
-            ring = true,
-            custom = mapOf(CALL_CUSTOM_IS_VIDEO to isVideoCall)
-          )
-        }
-        if (createResult.isFailure) {
-          videoMutableUiState.value = WhatsAppVideoUiState.Error
-          return@launch
-        }
+      )
+      if (createResult.isFailure) {
+        // Some Stream projects reject override settings; still create with custom flag.
+        createResult = call.create(
+          memberIds = allMembers,
+          ring = true,
+          custom = mapOf(CALL_CUSTOM_IS_VIDEO to isVideoCall)
+        )
+      }
+      if (createResult.isFailure) {
+        videoMutableUiState.value = WhatsAppVideoUiState.Error
+        return@launch
       }
 
-      // Apply camera/speaker before join so ringing/join media matches call type.
+      // Caller joins and waits in "Ringing…" until the callee accepts.
       applyLocalMediaDefaults(call)
-
-      // Incoming / rejoin must not create a new call — that breaks accept flows.
       val result = call.join(create = false)
 
       result.onSuccess {
         applyLocalMediaDefaults(call)
-        recordHistory(call, outgoing = memberIds.isNotEmpty())
+        recordHistory(call, outgoing = true)
         videoMutableUiState.value = WhatsAppVideoUiState.Success(call)
       }.onError {
         videoMutableUiState.value = WhatsAppVideoUiState.Error
@@ -138,8 +147,10 @@ class WhatsAppVideoCallViewModel @Inject constructor(
   }
 
   private fun applyLocalMediaDefaults(call: Call) {
+    // WhatsApp: video → speaker; voice → earpiece.
     runCatching { call.camera.setEnabled(isVideoCall) }
-    runCatching { call.speaker.setEnabled(true) }
+    runCatching { call.speaker.setEnabled(isVideoCall) }
+    runCatching { call.microphone.setEnabled(true) }
   }
 
   fun acceptIncoming(call: Call) {

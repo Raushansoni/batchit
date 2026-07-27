@@ -63,12 +63,17 @@ class MainActivity : ComponentActivity() {
     }
     val callId = intent.getStringExtra(EXTRA_OPEN_CALL)
     if (!callId.isNullOrBlank()) {
-      deepLinkBus.emit(
-        NotificationDeepLink.OpenVideoCall(
-          callId = callId,
-          video = intent.getBooleanExtra(EXTRA_CALL_VIDEO, true)
+      // Only open the in-call screen after an explicit Accept. Notification taps /
+      // full-screen intent just bring the app up so IncomingCallOverlay can ring.
+      val alreadyAccepted = intent.getBooleanExtra(EXTRA_CALL_ACCEPTED, false)
+      if (alreadyAccepted) {
+        deepLinkBus.emit(
+          NotificationDeepLink.OpenVideoCall(
+            callId = callId,
+            video = intent.getBooleanExtra(EXTRA_CALL_VIDEO, true)
+          )
         )
-      )
+      }
       return
     }
     if (intent.getBooleanExtra(EXTRA_OPEN_CALLS_TAB, false)) {
@@ -80,6 +85,7 @@ class MainActivity : ComponentActivity() {
     const val EXTRA_OPEN_CHANNEL = "batchit_open_channel"
     const val EXTRA_OPEN_CALL = "batchit_open_call"
     const val EXTRA_CALL_VIDEO = "batchit_call_video"
+    const val EXTRA_CALL_ACCEPTED = "batchit_call_accepted"
     const val EXTRA_OPEN_CALLS_TAB = "batchit_open_calls_tab"
 
     fun openAppIntent(context: Context): Intent =
@@ -92,14 +98,21 @@ class MainActivity : ComponentActivity() {
         putExtra(EXTRA_OPEN_CHANNEL, channelCid)
       }
 
+    /** Brings app to foreground for ringing UI — does not answer the call. */
     fun openIncomingCallIntent(context: Context, callId: String, isVideo: Boolean): Intent =
       openAppIntent(context).apply {
         putExtra(EXTRA_OPEN_CALL, callId)
         putExtra(EXTRA_CALL_VIDEO, isVideo)
+        putExtra(EXTRA_CALL_ACCEPTED, false)
       }
 
+    /** Opens active call UI after the user (or notification Accept) answered. */
     fun openVideoCallIntent(context: Context, callId: String, isVideo: Boolean): Intent =
-      openIncomingCallIntent(context, callId, isVideo)
+      openAppIntent(context).apply {
+        putExtra(EXTRA_OPEN_CALL, callId)
+        putExtra(EXTRA_CALL_VIDEO, isVideo)
+        putExtra(EXTRA_CALL_ACCEPTED, true)
+      }
 
     fun openCallsTabIntent(context: Context): Intent =
       openAppIntent(context).apply {

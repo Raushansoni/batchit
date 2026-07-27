@@ -31,12 +31,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.models.Channel
 import io.getstream.chat.android.models.User
@@ -155,11 +157,39 @@ private fun WhatsAppMessageUserInfo(
  */
 @Composable
 private fun rememberPeer(channel: Channel): User {
-  val me = remember { runCatching { ChatClient.instance().getCurrentUser()?.id }.getOrNull() }
-  return remember(channel.id, channel.members) {
-    channel.members.firstOrNull { it.user.id != me }?.user ?: channel.members.firstOrNull()?.user
-      ?: User(id = channel.id, name = channel.name)
+  val currentUser by ChatClient.instance().clientState.user.collectAsStateWithLifecycle()
+  val myId = currentUser?.id
+  return remember(channel.id, channel.members, channel.name, channel.image, myId) {
+    resolvePeerUser(channel = channel, myId = myId)
   }
+}
+
+internal fun resolvePeerUser(channel: Channel, myId: String?): User {
+  val members = channel.members.map { it.user }
+  // Prefer any member that is not me — never fall back to the local user.
+  members.firstOrNull { myId != null && it.id != myId }?.let { return it }
+
+  // messaging:{sortedId1}-{sortedId2} — parse the other uid from the channel id.
+  val rawId = channel.id.substringAfter(delimiter = ":", missingDelimiterValue = channel.id)
+  if (!myId.isNullOrBlank() && rawId.contains('-')) {
+    val otherId = rawId.split('-').firstOrNull { it.isNotBlank() && it != myId }
+    if (!otherId.isNullOrBlank()) {
+      members.firstOrNull { it.id == otherId }?.let { return it }
+      return User(
+        id = otherId,
+        name = channel.name.takeIf { it.isNotBlank() } ?: otherId,
+        image = channel.image
+      )
+    }
+  }
+
+  // Group / named channel: use channel metadata rather than the first member (often me).
+  if (channel.name.isNotBlank()) {
+    return User(id = channel.id, name = channel.name, image = channel.image)
+  }
+
+  return members.firstOrNull { !myId.isNullOrBlank() && it.id != myId }
+    ?: User(id = channel.id, name = "Chat", image = channel.image)
 }
 
 @Preview

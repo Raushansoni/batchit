@@ -16,28 +16,29 @@
 
 package io.getstream.whatsappclone.video
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.getstream.video.android.compose.theme.VideoTheme
-import io.getstream.video.android.compose.ui.components.call.controls.actions.DefaultOnCallActionHandler
-import io.getstream.video.android.compose.ui.components.call.ringing.RingingCallContent
 import io.getstream.video.android.core.Call
 import io.getstream.video.android.core.StreamVideo
-import io.getstream.video.android.core.call.state.AcceptCall
-import io.getstream.video.android.core.call.state.CancelCall
-import io.getstream.video.android.core.call.state.DeclineCall
 import io.getstream.whatsappclone.data.repository.CallHistoryRepository
 import io.getstream.whatsappclone.model.CallRecord
 import javax.inject.Inject
@@ -51,12 +52,20 @@ class IncomingCallViewModel @Inject constructor(
 
   fun accept(call: Call, isVideo: Boolean, onJoined: (Call) -> Unit) {
     viewModelScope.launch {
-      // Accept the ringing call so the caller is notified, then join.
       runCatching { call.accept() }
       val result = call.join()
       result.onSuccess {
+        applyMediaDefaults(call, isVideo)
         record(call, outgoing = false, missed = false, isVideo = isVideo)
         onJoined(call)
+      }.onError {
+        // Still open the call screen if accept succeeded but join raced.
+        val activeId = runCatching {
+          StreamVideo.instance().state.activeCall.value?.id
+        }.getOrNull()
+        if (activeId == call.id) {
+          onJoined(call)
+        }
       }
     }
   }
@@ -64,8 +73,15 @@ class IncomingCallViewModel @Inject constructor(
   fun reject(call: Call, isVideo: Boolean = true) {
     viewModelScope.launch {
       runCatching { call.reject() }
+      runCatching { call.leave() }
       record(call, outgoing = false, missed = true, isVideo = isVideo)
     }
+  }
+
+  private fun applyMediaDefaults(call: Call, isVideo: Boolean) {
+    runCatching { call.camera.setEnabled(isVideo) }
+    runCatching { call.speaker.setEnabled(isVideo) }
+    runCatching { call.microphone.setEnabled(true) }
   }
 
   private fun record(call: Call, outgoing: Boolean, missed: Boolean, isVideo: Boolean) {
@@ -94,59 +110,97 @@ fun IncomingCallOverlay(
     mutableStateOf(runCatching { StreamVideo.instance() }.getOrNull())
   }
 
-  // Video connects after auth; keep retrying so late init still shows ringing UI.
   LaunchedEffect(Unit) {
-    while (streamVideo == null) {
-      delay(750)
+    var attempts = 0
+    while (streamVideo == null && attempts < 40) {
+      delay(500)
       streamVideo = runCatching { StreamVideo.instance() }.getOrNull()
+      attempts++
     }
   }
 
   val videoClient = streamVideo ?: return
   val ringingCall by videoClient.state.ringingCall.collectAsStateWithLifecycle()
   val call = ringingCall ?: return
-  val scope = rememberCoroutineScope()
+
   val custom by call.state.custom.collectAsStateWithLifecycle()
   val settings by call.state.settings.collectAsStateWithLifecycle()
+  val members by call.state.members.collectAsStateWithLifecycle()
   val isVideo = remember(custom, settings) {
     resolveIsVideoCall(custom = custom, settings = settings)
   }
-  var acceptHandled by remember(call.id) { mutableStateOf(false) }
 
-  VideoTheme {
-    RingingCallContent(
-      call = call,
-      isVideoType = isVideo,
-      modifier = Modifier.fillMaxSize(),
-      onBackPressed = {
-        scope.launch { viewModel.reject(call, isVideo) }
-      },
-      onCallAction = { action ->
-        when (action) {
-          AcceptCall -> {
-            if (acceptHandled) return@RingingCallContent
+  val me = remember(videoClient) { videoClient.user.id }
+  val peer = remember(members, me) {
+    resolveCallPeer(
+      myId = me,
+      memberUsers = members.map { it.user }
+    )
+  }
+
+  var acceptHandled by remember(call.id) { mutableStateOf(false) }
+  var busy by remember(call.id) { mutableStateOf(false) }
+
+  // Do NOT auto-join when activeCall appears — only Accept (or notification Accept) may connect.
+
+  BackHandler(enabled = !busy) {
+    busy = true
+    viewModel.reject(call, isVideo)
+  }
+
+  WhatsAppCallBackground {
+    Box(modifier = Modifier.fillMaxSize()) {
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .align(Alignment.TopCenter),
+        horizontalAlignment = Alignment.CenterHorizontally
+      ) {
+        WhatsAppCallPeerHeader(
+          name = peer?.name.orEmpty().ifBlank { peer?.id.orEmpty() },
+          status = if (busy) {
+            "Connecting…"
+          } else if (isVideo) {
+            "Incoming video call"
+          } else {
+            "Incoming voice call"
+          },
+          imageUrl = peer?.image?.takeIf { it.isNotBlank() },
+          showPulse = !busy
+        )
+        Text(
+          text = "BatchIt",
+          color = CallSecondaryText,
+          fontSize = 13.sp,
+          fontWeight = FontWeight.Medium,
+          modifier = Modifier.fillMaxWidth(),
+          textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+      }
+
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .align(Alignment.BottomCenter)
+      ) {
+        WhatsAppIncomingActions(
+          isVideo = isVideo,
+          busy = busy,
+          onDecline = {
+            if (busy) return@WhatsAppIncomingActions
+            busy = true
+            viewModel.reject(call, isVideo)
+          },
+          onAccept = {
+            if (acceptHandled || busy) return@WhatsAppIncomingActions
             acceptHandled = true
+            busy = true
             viewModel.accept(call, isVideo) { joined ->
               onCallConnected(joined.id, isVideo)
             }
           }
-          DeclineCall, CancelCall -> {
-            scope.launch { viewModel.reject(call, isVideo) }
-          }
-          else -> DefaultOnCallActionHandler.onCallAction(call, action)
-        }
-      },
-      onAcceptedContent = {
-        // Covers accept paths that flip RingingState.Active without our AcceptCall handler
-        // (e.g. notification accept while overlay is still composed).
-        LaunchedEffect(call.id) {
-          if (acceptHandled) return@LaunchedEffect
-          acceptHandled = true
-          viewModel.accept(call, isVideo) { joined ->
-            onCallConnected(joined.id, isVideo)
-          }
-        }
+        )
       }
-    )
+    }
   }
 }
