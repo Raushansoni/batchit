@@ -18,6 +18,17 @@ package io.getstream.whatsappclone
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
+import io.getstream.whatsappclone.auth.StreamSessionManager
+import javax.inject.Inject
 
 @HiltAndroidApp
-class WhatsApp : Application()
+class WhatsApp : Application() {
+
+  @Inject
+  lateinit var streamSessionManager: StreamSessionManager
+
+  override fun onCreate() {
+    super.onCreate()
+    streamSessionManager.warmUpVideoForPersistedSession()
+  }
+}

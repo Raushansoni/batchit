@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,16 +113,13 @@ fun IncomingCallOverlay(
   onCallConnected: (callId: String, video: Boolean) -> Unit,
   viewModel: IncomingCallViewModel = hiltViewModel()
 ) {
-  var streamVideo by remember {
-    mutableStateOf(runCatching { StreamVideo.instance() }.getOrNull())
-  }
-
-  LaunchedEffect(Unit) {
-    var attempts = 0
-    while (streamVideo == null && attempts < 40) {
-      delay(500)
-      streamVideo = runCatching { StreamVideo.instance() }.getOrNull()
-      attempts++
+  val streamVideo by produceState<StreamVideo?>(initialValue = null) {
+    while (true) {
+      val current = runCatching { StreamVideo.instance() }.getOrNull()
+      if (current !== value) {
+        value = current
+      }
+      delay(if (current == null) 500 else 2_000)
     }
   }
 

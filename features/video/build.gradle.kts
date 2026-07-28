@@ -43,7 +43,7 @@ dependencies {
   implementation(project(":core:network"))
   implementation(project(":core:data"))
 
-  implementation(libs.accompanist.permissions)
+  implementation(libs.androidx.activity.compose)
 
   implementation(libs.stream.video.compose)
   implementation(libs.stream.video.mock)

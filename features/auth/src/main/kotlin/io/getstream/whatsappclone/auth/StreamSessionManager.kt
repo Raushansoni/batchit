@@ -73,6 +73,17 @@ class StreamSessionManager @Inject constructor(
     )
   }
 
+  /** Builds the Video client early so incoming-call pushes work after a cold process start. */
+  fun warmUpVideoForPersistedSession() {
+    val session = getPersistedSession() ?: return
+    scheduleVideoConnect(
+      userId = session.userId,
+      name = session.name,
+      image = session.image,
+      token = session.token
+    )
+  }
+
   suspend fun connectDemoUser(chatClient: ChatClient) {
     val existing = chatClient.getCurrentUser()
     if (existing?.id == DEMO_USER_ID) {

@@ -17,12 +17,24 @@
 package io.getstream.whatsappclone.video
 
 import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,8 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.getstream.video.android.compose.theme.VideoTheme
 import io.getstream.video.android.compose.ui.components.avatar.UserAvatarBackground
 import io.getstream.video.android.compose.ui.components.call.activecall.CallContent
@@ -71,9 +85,32 @@ fun WhatsAppVideoCall(
   viewModel: WhatsAppVideoCallViewModel = hiltViewModel()
 ) {
   val uiState by viewModel.videoUiSate.collectAsStateWithLifecycle()
+  val context = LocalContext.current
+  var permissionsDenied by remember { mutableStateOf(false) }
 
-  EnsureVideoCallPermissions(requireCamera = videoCall) {
-    viewModel.joinCall(type = "default", id = id.replace(":", ""))
+  EnsureVideoCallPermissions(
+    requireCamera = videoCall,
+    onPermissionsDenied = { permissionsDenied = true },
+    onPermissionsGranted = {
+      permissionsDenied = false
+      viewModel.joinCall(type = "default", id = id.replace(":", ""))
+    }
+  )
+
+  if (permissionsDenied) {
+    WhatsAppCallPermissionDenied(
+      videoCall = videoCall,
+      onOpenSettings = {
+        context.startActivity(
+          Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", context.packageName, null)
+          )
+        )
+      },
+      onClose = { viewModel.navigateUp() }
+    )
+    return
   }
 
   when (val state = uiState) {
@@ -91,6 +128,61 @@ fun WhatsAppVideoCall(
       videoCall = videoCall,
       onCancel = { viewModel.navigateUp() }
     )
+  }
+}
+
+@Composable
+private fun WhatsAppCallPermissionDenied(
+  videoCall: Boolean,
+  onOpenSettings: () -> Unit,
+  onClose: () -> Unit
+) {
+  BackHandler(onBack = onClose)
+  WhatsAppCallBackground {
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .padding(horizontal = 24.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center
+    ) {
+      Text(
+        text = "Permissions needed",
+        color = Color.White,
+        fontSize = 24.sp,
+        fontWeight = FontWeight.SemiBold
+      )
+      Text(
+        modifier = Modifier.padding(top = 12.dp),
+        text = if (videoCall) {
+          "Allow camera and microphone access in Settings to make video calls."
+        } else {
+          "Allow microphone access in Settings to make voice calls."
+        },
+        color = CallSecondaryText,
+        fontSize = 15.sp
+      )
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .navigationBarsPadding()
+          .padding(top = 36.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+      ) {
+        WhatsAppLabeledCallButton(
+          icon = Icons.Filled.CallEnd,
+          label = "Not now",
+          background = CallDeclineRed,
+          onClick = onClose
+        )
+        WhatsAppLabeledCallButton(
+          icon = Icons.Filled.Settings,
+          label = "Open settings",
+          background = CallAcceptGreen,
+          onClick = onOpenSettings
+        )
+      }
+    }
   }
 }
 
@@ -378,28 +470,45 @@ private fun WhatsAppVideoCallContentPreview() {
   ) {}
 }
 
-@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun EnsureVideoCallPermissions(
   requireCamera: Boolean = true,
+  onPermissionsDenied: () -> Unit = {},
   onPermissionsGranted: () -> Unit
 ) {
-  val permissionsState = rememberMultiplePermissionsState(
-    permissions = buildList {
-      if (requireCamera) {
-        add(Manifest.permission.CAMERA)
-      }
+  val context = LocalContext.current
+  val lifecycleOwner = LocalLifecycleOwner.current
+  val requiredPermissions = remember(requireCamera) {
+    buildList {
+      if (requireCamera) add(Manifest.permission.CAMERA)
       add(Manifest.permission.RECORD_AUDIO)
     }
-  )
-
-  LaunchedEffect(key1 = Unit) {
-    permissionsState.launchMultiplePermissionRequest()
+  }
+  fun allGranted() = requiredPermissions.all { permission ->
+    ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
   }
 
-  LaunchedEffect(key1 = permissionsState.allPermissionsGranted) {
-    if (permissionsState.allPermissionsGranted) {
-      onPermissionsGranted()
+  var granted by remember(requiredPermissions) { mutableStateOf(allGranted()) }
+  val launcher = rememberLauncherForActivityResult(
+    ActivityResultContracts.RequestMultiplePermissions()
+  ) { result ->
+    val nowGranted = requiredPermissions.all { result[it] == true }
+    granted = nowGranted
+    if (!nowGranted) onPermissionsDenied()
+  }
+
+  LaunchedEffect(requiredPermissions) {
+    if (granted) onPermissionsGranted() else launcher.launch(requiredPermissions.toTypedArray())
+  }
+
+  DisposableEffect(lifecycleOwner, granted) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME && !granted && allGranted()) {
+        granted = true
+        onPermissionsGranted()
+      }
     }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
   }
 }

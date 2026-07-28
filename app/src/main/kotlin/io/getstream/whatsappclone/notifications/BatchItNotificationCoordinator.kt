@@ -25,6 +25,7 @@ import io.getstream.chat.android.client.utils.observable.Disposable
 import io.getstream.log.streamLog
 import io.getstream.video.android.core.RingingState
 import io.getstream.video.android.core.StreamVideo
+import io.getstream.whatsappclone.auth.StreamSessionManager
 import io.getstream.whatsappclone.data.repository.CallHistoryRepository
 import io.getstream.whatsappclone.settings.SettingsRepository
 import io.getstream.whatsappclone.video.resolveIsVideoCall
@@ -37,6 +38,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /**
@@ -46,6 +50,7 @@ import kotlinx.coroutines.launch
 @Singleton
 class BatchItNotificationCoordinator @Inject constructor(
   private val chatClient: ChatClient,
+  private val streamSessionManager: StreamSessionManager,
   private val settingsRepository: SettingsRepository,
   private val callHistoryRepository: CallHistoryRepository,
   private val notifier: BatchItNotifier
@@ -57,6 +62,7 @@ class BatchItNotificationCoordinator @Inject constructor(
 
   private var messageDisposable: Disposable? = null
   private var callWatchJob: Job? = null
+  private var videoConnectionWatchJob: Job? = null
   private var historyWatchJob: Job? = null
   private var started = false
   private var lastRingingCallId: String? = null
@@ -78,6 +84,7 @@ class BatchItNotificationCoordinator @Inject constructor(
     ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleObserver)
     subscribeMessages()
     watchIncomingCalls()
+    watchVideoConnection()
     watchMissedCalls()
     streamLog { "BatchItNotificationCoordinator started" }
   }
@@ -90,6 +97,8 @@ class BatchItNotificationCoordinator @Inject constructor(
     messageDisposable = null
     callWatchJob?.cancel()
     callWatchJob = null
+    videoConnectionWatchJob?.cancel()
+    videoConnectionWatchJob = null
     historyWatchJob?.cancel()
     historyWatchJob = null
     lastRingingCallId = null
@@ -149,14 +158,11 @@ class BatchItNotificationCoordinator @Inject constructor(
   private fun watchIncomingCalls() {
     callWatchJob?.cancel()
     callWatchJob = scope.launch {
-      while (true) {
-        val video = runCatching { StreamVideo.instance() }.getOrNull()
-        if (video == null) {
-          kotlinx.coroutines.delay(1_500)
-          continue
+      streamVideoInstances()
+        .flatMapLatest { video ->
+          video?.state?.ringingCall ?: flowOf(null)
         }
-
-        video.state.ringingCall.collectLatest { call ->
+        .collectLatest { call ->
           val settings = settingsRepository.currentNotificationSettings()
           if (call == null) {
             lastRingingCallId?.let { notifier.cancelIncomingCallNotification(it) }
@@ -170,7 +176,7 @@ class BatchItNotificationCoordinator @Inject constructor(
           if (callId == lastRingingCallId) return@collectLatest
           lastRingingCallId = callId
 
-          val me = runCatching { video.user.id }.getOrNull().orEmpty()
+          val me = runCatching { StreamVideo.instance().user.id }.getOrNull().orEmpty()
           val ringingState = call.state.ringingState.value
           val createdById = call.state.createdBy.value?.id
           if (ringingState is RingingState.Outgoing || createdById == me) return@collectLatest
@@ -187,9 +193,27 @@ class BatchItNotificationCoordinator @Inject constructor(
             isVideo = isVideo
           )
         }
+    }
+  }
+
+  private fun watchVideoConnection() {
+    videoConnectionWatchJob?.cancel()
+    videoConnectionWatchJob = scope.launch {
+      while (started) {
+        if (runCatching { StreamVideo.instance() }.isFailure) {
+          streamSessionManager.ensureVideoConnected()
+        }
+        kotlinx.coroutines.delay(30_000)
       }
     }
   }
+
+  private fun streamVideoInstances() = flow {
+    while (started) {
+      emit(runCatching { StreamVideo.instance() }.getOrNull())
+      kotlinx.coroutines.delay(1_500)
+    }
+  }.distinctUntilChanged()
 
   private fun watchMissedCalls() {
     historyWatchJob?.cancel()

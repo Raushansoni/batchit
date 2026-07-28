@@ -49,18 +49,17 @@ internal class CallRingtonePlayer(private val context: Context) {
   }
 
   fun stop() {
-    runCatching {
-      player?.stop()
-      player?.release()
-    }
+    val current = player ?: return
     player = null
+    runCatching { current.stop() }
+    runCatching { current.release() }
   }
 
   private fun start(uri: Uri?) {
     if (uri == null) return
     stop()
     runCatching {
-      player = MediaPlayer().apply {
+      val mediaPlayer = MediaPlayer().apply {
         setAudioAttributes(
           AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
@@ -69,9 +68,20 @@ internal class CallRingtonePlayer(private val context: Context) {
         )
         setDataSource(context, uri)
         isLooping = true
-        prepare()
-        start()
+        setOnPreparedListener { preparedPlayer ->
+          if (player === preparedPlayer) {
+            runCatching { preparedPlayer.start() }
+          } else {
+            preparedPlayer.release()
+          }
+        }
+        setOnErrorListener { failedPlayer, _, _ ->
+          if (player === failedPlayer) stop()
+          true
+        }
+        prepareAsync()
       }
+      player = mediaPlayer
     }.onFailure {
       stop()
     }
