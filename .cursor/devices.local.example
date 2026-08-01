@@ -1,0 +1,6 @@
+# Copy to .cursor/devices.local (gitignored) and fill in wireless debugging endpoints.
+# Ports change when Wireless debugging is toggled — refresh from the phone UI.
+#
+# One host:port per line:
+# 192.168.1.19:43155
+# 192.168.1.6:45863

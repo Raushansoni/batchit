@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterShellExecution": [
+      {
+        "command": ".cursor/hooks/after-assemble-debug-install.sh",
+        "matcher": "assembleDebug",
+        "timeout": 180
+      }
+    ]
+  }
+}
