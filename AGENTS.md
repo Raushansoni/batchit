@@ -137,3 +137,47 @@ Prefer free-tier-safe solutions. Do not add Phone OTP, paid Cloud Functions, or 
 2. Mirror the closest existing feature (auth multi-step, settings child screen, status repo).
 3. Check [SETUP.md](SETUP.md) for Worker / secrets / update pipeline issues.
 4. Ask the user before changing billing tier assumptions or deleting upstream-compatible APIs.
+
+---
+
+## Cursor Cloud specific instructions
+
+Durable notes for cloud agents. The startup update script already runs `npm install` in
+`workers/stream-token` and `functions`, and copies `app/google-services.json` from the example
+placeholder if missing. System deps (JDK 17, Android SDK) are baked into the VM snapshot.
+
+### Toolchain (non-obvious)
+
+- **Use JDK 17, not JDK 21.** Both are installed; the snapshot sets `JAVA_HOME` to JDK 17 in
+  `~/.bashrc`. The Gradle build (AGP 8.4.1 / convention plugins target JVM 17) misbehaves under
+  JDK 21, so keep `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64` when invoking `./gradlew`.
+- **Android SDK** lives at `~/android-sdk` (`ANDROID_HOME`) with `platform-34`,
+  `build-tools;34.0.0`, and `platform-tools`. `~/.bashrc` exports `ANDROID_HOME`/`ANDROID_SDK_ROOT`.
+- `secrets.properties` is **not** required to build — the secrets Gradle plugin falls back to the
+  committed `secrets.defaults.properties`. `app/google-services.json` **is** required to compile;
+  the placeholder from `app/google-services.json.example` is enough to build, but real Google
+  Sign-In at runtime needs a real Firebase config.
+
+### Build / lint (see [AGENTS.md](AGENTS.md) "Build & verify" for commands)
+
+- App: `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` (~82 MB).
+- Lint/format: `./gradlew spotlessCheck` (CI gate) / `./gradlew spotlessApply` to fix. As of this
+  setup, `spotlessCheck` reports a **pre-existing** import-ordering violation in `features/video`
+  (unrelated to env setup); run `./gradlew :features:video:spotlessApply` to fix if in scope.
+
+### Running the app
+
+- **No `/dev/kvm` in the cloud VM**, so an Android emulator cannot run here. Verify Android
+  changes with `:app:assembleDebug` (+ `spotlessCheck`); run the app itself on a local machine
+  with an emulator or a physical device.
+
+### Stream-token Worker (`workers/stream-token`)
+
+- Run locally: `cd workers/stream-token && npx wrangler dev` (needs `.dev.vars`; copy from
+  `.dev.vars.example` and fill `STREAM_API_KEY` / `STREAM_API_SECRET` / `FIREBASE_PROJECT_ID`).
+- `GET /` is a health check (`{"ok":true,...}`). `POST /token` needs a real Firebase ID token
+  (Bearer) to mint a Stream JWT; without one it returns 401 after running the verify pipeline.
+
+### Firebase Functions (`functions/`) — optional (Blaze)
+
+- Not on the default free path. Local emulator: `cd functions && npm run serve` (Firebase CLI).
