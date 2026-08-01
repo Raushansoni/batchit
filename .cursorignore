@@ -24,7 +24,14 @@ proguard/
 .idea/
 *.iml
 .vscode/
-.cursor/
+.cursor/*
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
+!.cursor/skills/
+!.cursor/skills/**
+!.cursor/devices.local.example
+.cursor/devices.local
 
 # Secrets & local machine config
 local.properties

@@ -82,7 +82,14 @@ fastlane/test_output
 
 # IDE / agent local
 .vscode/
-.cursor/
+.cursor/*
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
+!.cursor/skills/
+!.cursor/skills/**
+!.cursor/devices.local.example
+.cursor/devices.local
 agent-tools/
 
 # Misc

@@ -100,6 +100,13 @@ Prefer free-tier-safe solutions. Do not add Phone OTP, paid Cloud Functions, or 
 
 ## Common tasks (checklist)
 
+### Install debug APK on phones
+
+- Skill: `.agents/skills/install-debug` (invoke with `/install-debug` or ask to install)
+- Script: `.agents/skills/install-debug/scripts/install-debug.sh --build`
+- Wireless endpoints: copy `.cursor/devices.local.example` → `.cursor/devices.local`
+- Auto after agent `assembleDebug`: `.cursor/hooks.json` → install-only when devices are online
+
 ### Add a settings sub-screen
 
 1. Composable + ViewModel (if needed) in `features/settings`
